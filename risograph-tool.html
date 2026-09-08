@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riso FX — Risograph Effect Tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#e8e3d8;
+    --panel:#f5f2ea;
+    --ink:#111;
+    --border:#111;
+    --muted:#6b6558;
+    --accent:#0078bf;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:"Geist", sans-serif;
+    font-optical-sizing:auto;
+    font-weight:300;
+    font-style:normal;
+    background:var(--bg);
+    color:var(--ink);
+    padding:16px;
+  }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:12px;
+    border-bottom:2px solid var(--ink);
+    padding-bottom:10px;
+  }
+  header h1{
+    font-size:18px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:1px;
+  }
+  header p{
+    margin:2px 0 0;
+    font-size:11px;
+    color:var(--muted);
+  }
+  header a{
+    font-size:11px;
+    color:var(--muted);
+    text-decoration:none;
+    white-space:nowrap;
+  }
+  header a:hover{ color:var(--ink); text-decoration:underline; }
+  .layout{
+    display:grid;
+    grid-template-columns:300px 1fr;
+    gap:16px;
+    align-items:start;
+  }
+  .canvas-wrap{
+    background:var(--panel);
+    border:2px solid var(--ink);
+    padding:10px;
+  }
+  .canvas-wrap .titlebar{
+    display:flex;
+    justify-content:space-between;
+    font-size:11px;
+    margin-bottom:8px;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  #canvasHost{
+    position:relative;
+    width:100%;
+    min-height:300px;
+    background:repeating-conic-gradient(#ddd 0% 25%, #eee 0% 50%) 50% / 16px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+  #outCanvas{
+    max-width:100%;
+    display:block;
+    image-rendering:pixelated;
+  }
+  .drop-hint{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    color:var(--muted);
+    text-align:center;
+    pointer-events:none;
+    padding:20px;
+  }
+  .panel{
+    background:var(--panel);
+    border:2px solid var(--ink);
+    padding:12px;
+    margin-bottom:12px;
+  }
+  .panel h2{
+    font-size:11px;
+    font-weight:600;
+    margin:0 0 10px;
+    text-transform:uppercase;
+    letter-spacing:1px;
+    border-bottom:1px solid var(--ink);
+    padding-bottom:6px;
+  }
+  .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:8px;
+    gap:8px;
+  }
+  .row label{
+    font-size:11px;
+    color:var(--muted);
+    flex:1;
+  }
+  .row .val{
+    font-size:11px;
+    min-width:34px;
+    text-align:right;
+  }
+  input[type=range]{
+    flex:2;
+    accent-color:var(--ink);
+  }
+  select, input[type=color]{
+    font-family:inherit;
+    font-size:11px;
+    border:1px solid var(--ink);
+    background:#fff;
+    padding:3px;
+  }
+  .btn{
+    font-family:inherit;
+    font-size:11px;
+    font-weight:500;
+    background:#fff;
+    border:1px solid var(--ink);
+    padding:7px 10px;
+    cursor:pointer;
+    text-transform:uppercase;
+    letter-spacing:.5px;
+  }
+  .btn:hover{ background:#111; color:#fff; }
+  .btn.primary{ background:#111; color:#fff; }
+  .btn.primary:hover{ background:#fff; color:#111; }
+  .btn-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  .swatches{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .swatch{
+    width:22px; height:22px;
+    border:2px solid transparent;
+    cursor:pointer;
+  }
+  .swatch.active{ border-color:var(--ink); }
+  .toggle-group{ display:flex; border:1px solid var(--ink); }
+  .toggle-group button{
+    flex:1;
+    font-family:inherit;
+    font-size:10px;
+    font-weight:500;
+    padding:6px 4px;
+    border:none;
+    background:#fff;
+    cursor:pointer;
+    text-transform:uppercase;
+  }
+  .toggle-group button.active{ background:#111; color:#fff; }
+  .layer-block{ border-top:1px dashed #999; padding-top:8px; margin-top:8px; }
+  .layer-label{ font-size:11px; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .dot{ width:10px; height:10px; display:inline-block; border:1px solid var(--ink); }
+  footer{
+    margin-top:16px;
+    font-size:10px;
+    color:var(--muted);
+    border-top:1px solid var(--muted);
+    padding-top:8px;
+  }
+  @media (max-width: 800px){
+    .layout{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>RISO FX</h1>
+    <p>simulador de efeito risográfico &middot; duotone &middot; halftone &middot; misregistration</p>
+  </div>
+  <a href="https://theodoros.cc" target="_blank" rel="noopener">theodoros.cc</a>
+</header>
+
+<div class="layout">
+  <div class="controls">
+
+    <div class="panel">
+      <h2>Imagem</h2>
+      <div class="btn-row">
+        <button class="btn primary" id="btnLoad">↑ carregar imagem</button>
+        <button class="btn" id="btnReset">reset</button>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" style="display:none">
+      <p style="font-size:10px;color:var(--muted);margin:8px 0 0 0;">arraste, cole (ctrl+v) ou clique para carregar</p>
+
+      <div class="row" style="margin-top:12px;"><label>proporção do recorte</label>
+        <select id="cropRatio">
+          <option value="original">original</option>
+          <option value="1:1">1:1</option>
+          <option value="4:5">4:5</option>
+          <option value="5:4">5:4</option>
+          <option value="16:9">16:9</option>
+          <option value="9:16">9:16</option>
+        </select>
+      </div>
+      <div class="btn-row" id="cropButtons" style="display:none;">
+        <button class="btn primary" id="btnApplyCrop" style="flex:1;">✓ aplicar recorte</button>
+      </div>
+      <div class="btn-row" id="editCropRow" style="display:none;">
+        <button class="btn" id="btnEditCrop" style="flex:1;">✂ editar recorte</button>
+      </div>
+      <p id="cropHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">arraste pra posicionar &middot; scroll pra zoom</p>
+    </div>
+
+    <div class="panel">
+      <h2 id="inksTitle">Tintas (duotone)</h2>
+
+      <div class="toggle-group" style="margin-bottom:10px;">
+        <button class="active" id="btnDuotone">duotone</button>
+        <button id="btnTritone">tritone</button>
+      </div>
+
+      <button class="btn" id="btnAutoThreshold" style="width:100%;margin-bottom:10px;">⚡ threshold automático (histograma)</button>
+
+      <div class="layer-block" style="border-top:none;padding-top:0;margin-top:0;">
+        <div class="layer-label"><span class="dot" id="dotA" style="background:#0078bf;"></span> Tinta A (sombras)</div>
+        <div class="swatches" id="swatchA"></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshA" min="0" max="255" value="90"><span class="val" id="threshAVal">90</span></div>
+      </div>
+
+      <div class="layer-block">
+        <div class="layer-label"><span class="dot" id="dotB" style="background:#ff48b0;"></span> Tinta B (meio-tom)</div>
+        <div class="swatches" id="swatchB"></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshB" min="0" max="255" value="170"><span class="val" id="threshBVal">170</span></div>
+      </div>
+
+      <div class="layer-block" id="layerBlockC" style="display:none;">
+        <div class="layer-label"><span class="dot" id="dotC" style="background:#a4dc30;"></span> Tinta C (realces)</div>
+        <div class="swatches" id="swatchC"></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshC" min="0" max="255" value="210"><span class="val" id="threshCVal">210</span></div>
+      </div>
+
+      <p id="contrastWarning" style="display:none;font-size:10px;line-height:1.4;color:#8a3b12;background:#fbe9d0;border:1px solid #8a3b12;padding:6px 8px;margin:10px 0 0;"></p>
+    </div>
+
+    <div class="panel">
+      <h2>Halftone</h2>
+      <div class="toggle-group" style="margin-bottom:10px;">
+        <button class="active" data-mode="grain" id="modeGrain">grain touch</button>
+        <button data-mode="screen" id="modeScreen">screen covered</button>
+        <button data-mode="stamp" id="modeStamp">stamp bleed</button>
+      </div>
+
+      <div id="grainControls">
+        <div class="row"><label>tamanho do grão</label><input type="range" id="grainSize" min="1" max="6" value="2"><span class="val" id="grainSizeVal">2</span></div>
+        <div class="row"><label>aleatoriedade</label><input type="range" id="grainRandom" min="0" max="100" value="55"><span class="val" id="grainRandomVal">55</span></div>
+      </div>
+
+      <div id="stampControls" style="display:none;">
+        <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">carimbo de tinta: a tinta de threshold mais alto vira a base sólida; as demais imprimem desgastadas por cima, revelando a de baixo nos furos.</p>
+        <div class="row"><label>sangria da borda</label><input type="range" id="stampBleed" min="0" max="100" value="40"><span class="val" id="stampBleedVal">40</span></div>
+        <div class="row"><label>distress (furos)</label><input type="range" id="stampDistress" min="0" max="100" value="35"><span class="val" id="stampDistressVal">35</span></div>
+        <div class="row"><label>escala do ruído</label><input type="range" id="stampScale" min="4" max="40" value="16"><span class="val" id="stampScaleVal">16</span></div>
+      </div>
+
+      <div id="screenControls" style="display:none;">
+        <div class="row"><label>frequência (px/célula)</label><input type="range" id="screenFreq" min="3" max="16" value="6"><span class="val" id="screenFreqVal">6</span></div>
+        <div class="row"><label>ângulo A</label><input type="range" id="angleA" min="0" max="90" value="15"><span class="val" id="angleAVal">15°</span></div>
+        <div class="row"><label>ângulo B</label><input type="range" id="angleB" min="0" max="90" value="75"><span class="val" id="angleBVal">75°</span></div>
+        <div class="row" id="angleCRow" style="display:none;"><label>ângulo C</label><input type="range" id="angleC" min="0" max="90" value="45"><span class="val" id="angleCVal">45°</span></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Misregistration</h2>
+      <div class="row"><label>offset A · x</label><input type="range" id="offAx" min="-10" max="10" value="0"><span class="val" id="offAxVal">0</span></div>
+      <div class="row"><label>offset A · y</label><input type="range" id="offAy" min="-10" max="10" value="0"><span class="val" id="offAyVal">0</span></div>
+      <div class="row"><label>offset B · x</label><input type="range" id="offBx" min="-10" max="10" value="2"><span class="val" id="offBxVal">2</span></div>
+      <div class="row"><label>offset B · y</label><input type="range" id="offBy" min="-10" max="10" value="-1"><span class="val" id="offByVal">-1</span></div>
+      <div class="row" id="offCxRow" style="display:none;"><label>offset C · x</label><input type="range" id="offCx" min="-10" max="10" value="-2"><span class="val" id="offCxVal">-2</span></div>
+      <div class="row" id="offCyRow" style="display:none;"><label>offset C · y</label><input type="range" id="offCy" min="-10" max="10" value="2"><span class="val" id="offCyVal">2</span></div>
+      <button class="btn" id="btnJitter" style="width:100%;margin-top:4px;">🎲 randomize jitter</button>
+    </div>
+
+    <div class="panel">
+      <h2>Papel &amp; Grão</h2>
+      <div class="row"><label>fundo</label>
+        <select id="paperSelect">
+          <option value="#f2ede1">branco riso</option>
+          <option value="#e8ddc4">kraft claro</option>
+          <option value="#d8cdb4">kraft</option>
+          <option value="#e3e3e3">cinza</option>
+          <option value="custom">custom…</option>
+        </select>
+      </div>
+      <div class="row" id="customPaperRow" style="display:none;">
+        <label>cor custom</label><input type="color" id="paperCustom" value="#f2ede1">
+      </div>
+      <div class="row"><label>textura de papel</label><input type="range" id="paperTexture" min="0" max="100" value="45"><span class="val" id="paperTextureVal">45</span></div>
+      <div class="row"><label>grão global</label><input type="range" id="globalGrain" min="0" max="60" value="15"><span class="val" id="globalGrainVal">15</span></div>
+    </div>
+
+    <div class="panel">
+      <h2>Export</h2>
+      <div class="row"><label>resolução (lado maior)</label></div>
+      <div class="toggle-group" style="margin-bottom:10px;">
+        <button class="active" data-res="preview" id="resPreview">preview</button>
+        <button data-res="2048" id="res2k">2k</button>
+        <button data-res="4096" id="res4k">4k</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btnExport" style="flex:1;">↓ export png</button>
+      </div>
+      <p id="exportStatus" style="font-size:10px;color:var(--muted);margin:8px 0 0;height:12px;"></p>
+    </div>
+
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="titlebar"><span id="canvasTitle">PREVIEW</span><span id="statusLabel">sem imagem</span></div>
+    <div id="canvasHost">
+      <canvas id="outCanvas" width="900" height="600"></canvas>
+      <canvas id="cropCanvas" width="900" height="600" style="display:none;max-width:100%;cursor:grab;"></canvas>
+      <div class="drop-hint" id="dropHint">solte uma imagem aqui, cole com ctrl+v,<br>ou use "carregar imagem"</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  riso fx &middot; processamento 100% local no navegador (canvas 2d) &middot; nenhuma imagem é enviada a servidor
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Riso ink palette (approx. screen hex) ----------
+  const PALETTE = [
+    {name:"Black", hex:"#000000"},
+    {name:"Fluorescent Pink", hex:"#ff48b0"},
+    {name:"Federal Blue", hex:"#0078bf"},
+    {name:"Sun Yellow", hex:"#ffe800"},
+    {name:"Bright Red", hex:"#ff665e"},
+    {name:"Fluorescent Orange", hex:"#ff6e40"},
+    {name:"Teal", hex:"#3d8e84"},
+    {name:"Purple", hex:"#3f2b6c"},
+    {name:"Fluorescent Green", hex:"#a4dc30"},
+    {name:"Medium Blue", hex:"#6f8dce"},
+  ];
+
+  // ---------- state ----------
+  const state = {
+    img: null,
+    inkA: "#0078bf",
+    inkB: "#ff48b0",
+    inkC: "#a4dc30",
+    threshA: 90,
+    threshB: 170,
+    threshC: 210,
+    thirdInkEnabled: false,
+    halftoneMode: "grain",
+    grainSize: 2,
+    grainRandom: 55,
+    screenFreq: 6,
+    angleA: 15,
+    angleB: 75,
+    angleC: 45,
+    stampBleed: 40,
+    stampDistress: 35,
+    stampScale: 16,
+    offAx: 0, offAy: 0,
+    offBx: 2, offBy: -1,
+    offCx: -2, offCy: 2,
+    paper: "#f2ede1",
+    paperTexture: 45,
+    globalGrain: 15,
+    crop: { ratio: 'original', scale: 1, offX: 0, offY: 0 },
+    cropApplied: false,
+  };
+
+  const outCanvas = document.getElementById('outCanvas');
+  const octx = outCanvas.getContext('2d');
+  const cropCanvas = document.getElementById('cropCanvas');
+  const cctx = cropCanvas.getContext('2d');
+  const dropHint = document.getElementById('dropHint');
+  const statusLabel = document.getElementById('statusLabel');
+  const canvasTitle = document.getElementById('canvasTitle');
+
+  // offscreen working canvases
+  const srcCanvas = document.createElement('canvas');
+  const sctx = srcCanvas.getContext('2d', {willReadFrequently:true});
+
+  function buildSwatches(container, key, dotEl){
+    PALETTE.forEach(c=>{
+      const el = document.createElement('div');
+      el.className = 'swatch' + (c.hex === state[key] ? ' active' : '');
+      el.style.background = c.hex;
+      el.title = c.name;
+      el.addEventListener('click', ()=>{
+        state[key] = c.hex;
+        [...container.children].forEach(ch=>ch.classList.remove('active'));
+        el.classList.add('active');
+        dotEl.style.background = c.hex;
+        checkInkContrast();
+        render();
+      });
+      container.appendChild(el);
+    });
+  }
+  buildSwatches(document.getElementById('swatchA'), 'inkA', document.getElementById('dotA'));
+  buildSwatches(document.getElementById('swatchB'), 'inkB', document.getElementById('dotB'));
+  buildSwatches(document.getElementById('swatchC'), 'inkC', document.getElementById('dotC'));
+  // mark defaults active
+  [...document.getElementById('swatchA').children].find(c=>c.style.background===hexToRgbStr(state.inkA))?.classList.add('active');
+
+  function hexToRgbStr(hex){
+    const c = hexToRgb(hex);
+    return `rgb(${c.r}, ${c.g}, ${c.b})`;
+  }
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    if(hex.length===3) hex = hex.split('').map(h=>h+h).join('');
+    const num = parseInt(hex,16);
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
+  }
+  function luminance(hex){
+    const {r,g,b} = hexToRgb(hex);
+    return 0.299*r + 0.587*g + 0.114*b;
+  }
+
+  // warns when an ink is too close in luminance to the paper (translucent/
+  // multiply-printed inks that are close to the paper tone become nearly
+  // invisible on press — real riso quirk, not a rendering bug) or when the
+  // two inks are too close to each other to read as distinct layers.
+  const CONTRAST_THRESHOLD = 40;
+  function checkInkContrast(){
+    const warnEl = document.getElementById('contrastWarning');
+    const paperLum = luminance(state.paper);
+    const inks = [['A', state.inkA], ['B', state.inkB]];
+    if(state.thirdInkEnabled) inks.push(['C', state.inkC]);
+
+    const msgs = [];
+    const okPairs = [];
+    for(const [name, hex] of inks){
+      const diff = Math.abs(luminance(hex) - paperLum);
+      okPairs.push(diff >= CONTRAST_THRESHOLD);
+      if(diff < CONTRAST_THRESHOLD) msgs.push(`tinta ${name} está muito próxima do papel — pode quase sumir na impressão.`);
+    }
+    for(let i=0; i<inks.length; i++){
+      for(let j=i+1; j<inks.length; j++){
+        if(!okPairs[i] || !okPairs[j]) continue; // already flagged against paper
+        const diff = Math.abs(luminance(inks[i][1]) - luminance(inks[j][1]));
+        if(diff < CONTRAST_THRESHOLD){
+          msgs.push(`tinta ${inks[i][0]} e tinta ${inks[j][0]} são parecidas entre si — as camadas podem ficar difíceis de distinguir.`);
+        }
+      }
+    }
+
+    if(msgs.length){
+      warnEl.textContent = '⚠ ' + msgs.join(' ');
+      warnEl.style.display = '';
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+
+  // ---------- bind simple range/select controls ----------
+  function bindRange(id, key, valId, suffix){
+    const el = document.getElementById(id);
+    const valEl = valId ? document.getElementById(valId) : null;
+    el.addEventListener('input', ()=>{
+      state[key] = Number(el.value);
+      if(valEl) valEl.textContent = el.value + (suffix||'');
+      render();
+    });
+  }
+  bindRange('threshA','threshA','threshAVal');
+  bindRange('threshB','threshB','threshBVal');
+  bindRange('threshC','threshC','threshCVal');
+  bindRange('grainSize','grainSize','grainSizeVal');
+  bindRange('grainRandom','grainRandom','grainRandomVal');
+  bindRange('screenFreq','screenFreq','screenFreqVal');
+  bindRange('angleA','angleA','angleAVal','°');
+  bindRange('angleB','angleB','angleBVal','°');
+  bindRange('angleC','angleC','angleCVal','°');
+  bindRange('stampBleed','stampBleed','stampBleedVal');
+  bindRange('stampDistress','stampDistress','stampDistressVal');
+  bindRange('stampScale','stampScale','stampScaleVal');
+  bindRange('offAx','offAx','offAxVal');
+  bindRange('offAy','offAy','offAyVal');
+  bindRange('offBx','offBx','offBxVal');
+  bindRange('offBy','offBy','offByVal');
+  bindRange('offCx','offCx','offCxVal');
+  bindRange('offCy','offCy','offCyVal');
+  bindRange('paperTexture','paperTexture','paperTextureVal');
+  bindRange('globalGrain','globalGrain','globalGrainVal');
+
+  document.getElementById('modeGrain').addEventListener('click', ()=>setMode('grain'));
+  document.getElementById('modeScreen').addEventListener('click', ()=>setMode('screen'));
+  document.getElementById('modeStamp').addEventListener('click', ()=>setMode('stamp'));
+  function setMode(m){
+    state.halftoneMode = m;
+    document.getElementById('modeGrain').classList.toggle('active', m==='grain');
+    document.getElementById('modeScreen').classList.toggle('active', m==='screen');
+    document.getElementById('modeStamp').classList.toggle('active', m==='stamp');
+    document.getElementById('grainControls').style.display = m==='grain' ? '' : 'none';
+    document.getElementById('screenControls').style.display = m==='screen' ? '' : 'none';
+    document.getElementById('stampControls').style.display = m==='stamp' ? '' : 'none';
+    document.getElementById('angleCRow').style.display = (m==='screen' && state.thirdInkEnabled) ? '' : 'none';
+    render();
+  }
+
+  const paperSelect = document.getElementById('paperSelect');
+  const customPaperRow = document.getElementById('customPaperRow');
+  const paperCustom = document.getElementById('paperCustom');
+  paperSelect.addEventListener('change', ()=>{
+    if(paperSelect.value === 'custom'){
+      customPaperRow.style.display = '';
+      state.paper = paperCustom.value;
+    } else {
+      customPaperRow.style.display = 'none';
+      state.paper = paperSelect.value;
+    }
+    checkInkContrast();
+    render();
+  });
+  paperCustom.addEventListener('input', ()=>{
+    state.paper = paperCustom.value;
+    checkInkContrast();
+    render();
+  });
+
+  checkInkContrast();
+
+  function setInkMode(tritone){
+    state.thirdInkEnabled = tritone;
+    document.getElementById('btnDuotone').classList.toggle('active', !tritone);
+    document.getElementById('btnTritone').classList.toggle('active', tritone);
+    document.getElementById('layerBlockC').style.display = tritone ? '' : 'none';
+    document.getElementById('angleCRow').style.display = (tritone && state.halftoneMode==='screen') ? '' : 'none';
+    document.getElementById('offCxRow').style.display = tritone ? '' : 'none';
+    document.getElementById('offCyRow').style.display = tritone ? '' : 'none';
+    document.getElementById('inksTitle').textContent = tritone ? 'Tintas (tritone)' : 'Tintas (duotone)';
+    checkInkContrast();
+    if(state.cropApplied){ applyAutoThreshold(); render(); }
+  }
+  document.getElementById('btnDuotone').addEventListener('click', ()=>setInkMode(false));
+  document.getElementById('btnTritone').addEventListener('click', ()=>setInkMode(true));
+
+  document.getElementById('btnJitter').addEventListener('click', ()=>{
+    state.offAx = Math.round((Math.random()-0.5)*12);
+    state.offAy = Math.round((Math.random()-0.5)*12);
+    state.offBx = Math.round((Math.random()-0.5)*12);
+    state.offBy = Math.round((Math.random()-0.5)*12);
+    document.getElementById('offAx').value = state.offAx; document.getElementById('offAxVal').textContent = state.offAx;
+    document.getElementById('offAy').value = state.offAy; document.getElementById('offAyVal').textContent = state.offAy;
+    document.getElementById('offBx').value = state.offBx; document.getElementById('offBxVal').textContent = state.offBx;
+    document.getElementById('offBy').value = state.offBy; document.getElementById('offByVal').textContent = state.offBy;
+    if(state.thirdInkEnabled){
+      state.offCx = Math.round((Math.random()-0.5)*12);
+      state.offCy = Math.round((Math.random()-0.5)*12);
+      document.getElementById('offCx').value = state.offCx; document.getElementById('offCxVal').textContent = state.offCx;
+      document.getElementById('offCy').value = state.offCy; document.getElementById('offCyVal').textContent = state.offCy;
+    }
+    render();
+  });
+
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    state.img = null;
+    state.cropApplied = false;
+    dropHint.style.display = 'flex';
+    statusLabel.textContent = 'sem imagem';
+    canvasTitle.textContent = 'PREVIEW';
+    octx.clearRect(0,0,outCanvas.width,outCanvas.height);
+    cropCanvas.style.display = 'none';
+    outCanvas.style.display = '';
+    document.getElementById('cropButtons').style.display = 'none';
+    document.getElementById('editCropRow').style.display = 'none';
+    document.getElementById('cropHint').style.display = 'none';
+  });
+
+  // ---------- crop & zoom (runs before the effect pipeline) ----------
+  const ASPECTS = { '1:1':1, '4:5':0.8, '5:4':1.25, '16:9':16/9, '9:16':9/16 };
+  const CROP_MAX_DIM = 1100;
+
+  function currentAspectRatio(){
+    if(state.crop.ratio === 'original'){
+      return state.img.naturalWidth / state.img.naturalHeight;
+    }
+    return ASPECTS[state.crop.ratio];
+  }
+
+  function computeCropDims(){
+    const ratio = currentAspectRatio();
+    let w, h;
+    if(ratio >= 1){ w = CROP_MAX_DIM; h = Math.round(CROP_MAX_DIM/ratio); }
+    else { h = CROP_MAX_DIM; w = Math.round(CROP_MAX_DIM*ratio); }
+    return {w, h};
+  }
+
+  function coverScale(w, h){
+    const img = state.img;
+    return Math.max(w/img.naturalWidth, h/img.naturalHeight);
+  }
+
+  function clampCropOffsets(){
+    const img = state.img;
+    const {width:w, height:h} = cropCanvas;
+    const iw = img.naturalWidth*state.crop.scale, ih = img.naturalHeight*state.crop.scale;
+    // image must always fully cover the crop frame: offsets stay between
+    // (frame - image) and 0 on each axis.
+    state.crop.offX = Math.min(0, Math.max(w-iw, state.crop.offX));
+    state.crop.offY = Math.min(0, Math.max(h-ih, state.crop.offY));
+  }
+
+  function resetCropFit(){
+    const {w, h} = computeCropDims();
+    cropCanvas.width = w; cropCanvas.height = h;
+    state.crop.scale = coverScale(w, h);
+    state.crop.offX = (w - state.img.naturalWidth*state.crop.scale)/2;
+    state.crop.offY = (h - state.img.naturalHeight*state.crop.scale)/2;
+  }
+
+  function drawCropCanvas(){
+    const img = state.img;
+    const {width:w, height:h} = cropCanvas;
+    cctx.clearRect(0,0,w,h);
+    cctx.drawImage(img, state.crop.offX, state.crop.offY, img.naturalWidth*state.crop.scale, img.naturalHeight*state.crop.scale);
+    // rule-of-thirds guide
+    cctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    cctx.lineWidth = 1;
+    for(const f of [1/3, 2/3]){
+      cctx.beginPath(); cctx.moveTo(w*f,0); cctx.lineTo(w*f,h); cctx.stroke();
+      cctx.beginPath(); cctx.moveTo(0,h*f); cctx.lineTo(w,h*f); cctx.stroke();
+    }
+  }
+
+  function showCropUI(){
+    outCanvas.style.display = 'none';
+    cropCanvas.style.display = '';
+    document.getElementById('cropButtons').style.display = '';
+    document.getElementById('editCropRow').style.display = 'none';
+    document.getElementById('cropHint').style.display = '';
+    canvasTitle.textContent = 'AJUSTAR RECORTE';
+    drawCropCanvas();
+  }
+
+  function showResultUI(){
+    cropCanvas.style.display = 'none';
+    outCanvas.style.display = '';
+    document.getElementById('cropButtons').style.display = 'none';
+    document.getElementById('editCropRow').style.display = '';
+    document.getElementById('cropHint').style.display = 'none';
+    canvasTitle.textContent = 'PREVIEW';
+  }
+
+  function applyCrop(){
+    const img = state.img;
+    const {width:w, height:h} = cropCanvas;
+    outCanvas.width = w; outCanvas.height = h;
+    srcCanvas.width = w; srcCanvas.height = h;
+    sctx.clearRect(0,0,w,h);
+    sctx.drawImage(img, state.crop.offX, state.crop.offY, img.naturalWidth*state.crop.scale, img.naturalHeight*state.crop.scale);
+    grayCache = null;
+    state.cropApplied = true;
+    applyAutoThreshold();
+    statusLabel.textContent = w + '×' + h + ' (recortado)';
+    showResultUI();
+    render();
+  }
+
+  document.getElementById('cropRatio').addEventListener('change', e=>{
+    state.crop.ratio = e.target.value;
+    if(!state.img) return;
+    resetCropFit();
+    drawCropCanvas();
+  });
+  document.getElementById('btnApplyCrop').addEventListener('click', applyCrop);
+  document.getElementById('btnEditCrop').addEventListener('click', ()=>{
+    showCropUI();
+  });
+
+  let dragging = false, dragLastX = 0, dragLastY = 0;
+  function cropCanvasPoint(e){
+    const rect = cropCanvas.getBoundingClientRect();
+    const scaleX = cropCanvas.width/rect.width, scaleY = cropCanvas.height/rect.height;
+    return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
+  }
+  cropCanvas.addEventListener('mousedown', e=>{
+    dragging = true;
+    dragLastX = e.clientX; dragLastY = e.clientY;
+    cropCanvas.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    const rect = cropCanvas.getBoundingClientRect();
+    const scaleX = cropCanvas.width/rect.width, scaleY = cropCanvas.height/rect.height;
+    state.crop.offX += (e.clientX-dragLastX)*scaleX;
+    state.crop.offY += (e.clientY-dragLastY)*scaleY;
+    dragLastX = e.clientX; dragLastY = e.clientY;
+    clampCropOffsets();
+    drawCropCanvas();
+  });
+  window.addEventListener('mouseup', ()=>{
+    dragging = false;
+    cropCanvas.style.cursor = 'grab';
+  });
+  cropCanvas.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const {x:mx, y:my} = cropCanvasPoint(e);
+    const factor = e.deltaY < 0 ? 1.08 : 1/1.08;
+    const minScale = coverScale(cropCanvas.width, cropCanvas.height);
+    const oldScale = state.crop.scale;
+    const newScale = Math.min(minScale*6, Math.max(minScale, oldScale*factor));
+    // keep the point under the cursor fixed while zooming
+    const imgX = (mx - state.crop.offX)/oldScale, imgY = (my - state.crop.offY)/oldScale;
+    state.crop.scale = newScale;
+    state.crop.offX = mx - imgX*newScale;
+    state.crop.offY = my - imgY*newScale;
+    clampCropOffsets();
+    drawCropCanvas();
+  }, {passive:false});
+
+  // ---------- image loading ----------
+  const fileInput = document.getElementById('fileInput');
+  document.getElementById('btnLoad').addEventListener('click', ()=>fileInput.click());
+  fileInput.addEventListener('change', e=>{
+    if(e.target.files && e.target.files[0]) loadFile(e.target.files[0]);
+  });
+
+  const host = document.getElementById('canvasHost');
+  host.addEventListener('dragover', e=>{ e.preventDefault(); });
+  host.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+  window.addEventListener('paste', e=>{
+    const items = e.clipboardData?.items || [];
+    for(const item of items){
+      if(item.type.indexOf('image') !== -1){
+        loadFile(item.getAsFile());
+        break;
+      }
+    }
+  });
+
+  function loadFile(file){
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      state.img = img;
+      state.cropApplied = false;
+      URL.revokeObjectURL(url);
+      dropHint.style.display = 'none';
+      statusLabel.textContent = img.naturalWidth + '×' + img.naturalHeight;
+      resetCropFit();
+      showCropUI();
+    };
+    img.src = url;
+  }
+
+  // ---------- core render pipeline ----------
+  let grayCache = null;
+  let grayCacheKey = null;
+
+  function getGray(){
+    const key = srcCanvas.width+'x'+srcCanvas.height;
+    if(grayCache && grayCacheKey===key) return grayCache;
+    const {width:w, height:h} = srcCanvas;
+    const imgData = sctx.getImageData(0,0,w,h);
+    const d = imgData.data;
+    const gray = new Uint8ClampedArray(w*h);
+    for(let i=0, p=0; i<d.length; i+=4, p++){
+      gray[p] = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    }
+    grayCache = {w,h,gray};
+    grayCacheKey = key;
+    return grayCache;
+  }
+
+  // ---------- automatic threshold (multi-level Otsu) ----------
+  // finds the two cutoffs (t1 < t2) that best split the image's luminance
+  // histogram into three classes (shadows / midtones / highlights) by
+  // maximizing between-class variance — the standard Otsu criterion
+  // extended to two thresholds. adapts threshA/threshB to each photo's
+  // actual exposure instead of relying on fixed defaults.
+  function computeHistogram(gray){
+    const hist = new Uint32Array(256);
+    for(let i=0;i<gray.gray.length;i++) hist[gray.gray[i]]++;
+    return hist;
+  }
+
+  function otsuTwoThresholds(hist){
+    const cumCount = new Float64Array(256);
+    const cumSum = new Float64Array(256);
+    let c=0, s=0;
+    for(let i=0;i<256;i++){
+      c += hist[i];
+      s += i*hist[i];
+      cumCount[i]=c;
+      cumSum[i]=s;
+    }
+    const total = cumCount[255];
+    if(total===0) return {t1:90, t2:170};
+    const totalMean = cumSum[255]/total;
+
+    let best = {variance:-1, t1:90, t2:170};
+    for(let t1=0; t1<254; t1++){
+      const n0 = cumCount[t1];
+      if(n0===0) continue;
+      const m0 = cumSum[t1]/n0;
+      const w0 = n0/total;
+      for(let t2=t1+1; t2<255; t2++){
+        const n1 = cumCount[t2]-cumCount[t1];
+        const n2 = total-cumCount[t2];
+        if(n1===0 || n2===0) continue;
+        const m1 = (cumSum[t2]-cumSum[t1])/n1;
+        const m2 = (cumSum[255]-cumSum[t2])/n2;
+        const w1 = n1/total, w2 = n2/total;
+        const variance = w0*(m0-totalMean)*(m0-totalMean)
+                        + w1*(m1-totalMean)*(m1-totalMean)
+                        + w2*(m2-totalMean)*(m2-totalMean);
+        if(variance > best.variance){
+          best = {variance, t1, t2};
+        }
+      }
+    }
+    return best;
+  }
+
+  // three-threshold (four-class) extension of the same Otsu criterion, used
+  // when the third ink slot (tritone) is enabled. O(256^3/6) combinations —
+  // still comfortably sub-100ms since each step is a handful of flops over
+  // precomputed cumulative sums.
+  function otsuThreeThresholds(hist){
+    const cumCount = new Float64Array(256);
+    const cumSum = new Float64Array(256);
+    let c=0, s=0;
+    for(let i=0;i<256;i++){
+      c += hist[i];
+      s += i*hist[i];
+      cumCount[i]=c;
+      cumSum[i]=s;
+    }
+    const total = cumCount[255];
+    if(total===0) return {t1:70, t2:140, t3:200};
+    const totalMean = cumSum[255]/total;
+
+    let best = {variance:-1, t1:70, t2:140, t3:200};
+    for(let t1=0; t1<252; t1++){
+      const n0 = cumCount[t1];
+      if(n0===0) continue;
+      const m0 = cumSum[t1]/n0;
+      const w0 = n0/total;
+      for(let t2=t1+1; t2<253; t2++){
+        const n1 = cumCount[t2]-cumCount[t1];
+        if(n1===0) continue;
+        const m1 = (cumSum[t2]-cumSum[t1])/n1;
+        const w1 = n1/total;
+        for(let t3=t2+1; t3<254; t3++){
+          const n2 = cumCount[t3]-cumCount[t2];
+          const n3 = total-cumCount[t3];
+          if(n2===0 || n3===0) continue;
+          const m2 = (cumSum[t3]-cumSum[t2])/n2;
+          const m3 = (cumSum[255]-cumSum[t3])/n3;
+          const w2 = n2/total, w3 = n3/total;
+          const variance = w0*(m0-totalMean)*(m0-totalMean)
+                          + w1*(m1-totalMean)*(m1-totalMean)
+                          + w2*(m2-totalMean)*(m2-totalMean)
+                          + w3*(m3-totalMean)*(m3-totalMean);
+          if(variance > best.variance){
+            best = {variance, t1, t2, t3};
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  function applyAutoThreshold(){
+    if(!state.img) return;
+    const gray = getGray();
+    const hist = computeHistogram(gray);
+    if(state.thirdInkEnabled){
+      const {t1, t2, t3} = otsuThreeThresholds(hist);
+      state.threshA = t1; state.threshB = t2; state.threshC = t3;
+      document.getElementById('threshA').value = t1; document.getElementById('threshAVal').textContent = t1;
+      document.getElementById('threshB').value = t2; document.getElementById('threshBVal').textContent = t2;
+      document.getElementById('threshC').value = t3; document.getElementById('threshCVal').textContent = t3;
+    } else {
+      const {t1, t2} = otsuTwoThresholds(hist);
+      state.threshA = t1;
+      state.threshB = t2;
+      document.getElementById('threshA').value = t1;
+      document.getElementById('threshAVal').textContent = t1;
+      document.getElementById('threshB').value = t2;
+      document.getElementById('threshBVal').textContent = t2;
+    }
+  }
+
+  document.getElementById('btnAutoThreshold').addEventListener('click', ()=>{
+    if(!state.cropApplied){ alert('aplique o recorte primeiro'); return; }
+    applyAutoThreshold();
+    render();
+  });
+
+  // cheap smooth ("value") noise: coarse random grid, bilinearly interpolated.
+  // used for the stamp mode's organic edge bleed / distress holes.
+  function smoothstep(t){ return t*t*(3-2*t); }
+  function makeNoiseField(w, h, cell, seedOffset){
+    const gw = Math.ceil(w/cell)+2, gh = Math.ceil(h/cell)+2;
+    const grid = new Float32Array(gw*gh);
+    for(let i=0;i<grid.length;i++) grid[i] = Math.random();
+    return function(x,y){
+      const gx = x/cell + (seedOffset||0), gy = y/cell + (seedOffset||0);
+      const x0 = Math.floor(gx), y0 = Math.floor(gy);
+      const tx = smoothstep(gx-x0), ty = smoothstep(gy-y0);
+      const i00 = (y0%gh)*gw + (x0%gw), i10 = (y0%gh)*gw + ((x0+1)%gw);
+      const i01 = ((y0+1)%gh)*gw + (x0%gw), i11 = ((y0+1)%gh)*gw + ((x0+1)%gw);
+      const a = grid[i00] + (grid[i10]-grid[i00])*tx;
+      const b = grid[i01] + (grid[i11]-grid[i01])*tx;
+      return a + (b-a)*ty;
+    };
+  }
+
+  // builds a canvas containing the solid ink color masked by the halftone
+  // pattern derived from `gray`, restricted to tones darker than `threshold`.
+  // `role` only matters for 'stamp' mode: 'base' = solid silhouette (no holes),
+  // 'top' = distressed impression printed over the base (gets punched holes).
+  function buildInkLayer(gray, w, h, threshold, colorHex, mode, angleDeg, role, params){
+    const layer = document.createElement('canvas');
+    layer.width = w; layer.height = h;
+    const lctx = layer.getContext('2d');
+    const imgData = lctx.createImageData(w,h);
+    const d = imgData.data;
+    const {r,g,b} = hexToRgb(colorHex);
+
+    if(mode === 'grain'){
+      const cell = params.grainSize;
+      const randomAmt = params.grainRandom/100;
+      for(let y=0; y<h; y+=cell){
+        for(let x=0; x<w; x+=cell){
+          // average tone in this cell
+          let sum=0, count=0;
+          for(let yy=y; yy<Math.min(y+cell,h); yy++){
+            for(let xx=x; xx<Math.min(x+cell,w); xx++){
+              sum += gray.gray[yy*w+xx]; count++;
+            }
+          }
+          const avg = sum/count;
+          const noise = (Math.random()-0.5) * 255 * randomAmt;
+          const on = (avg + noise) < threshold;
+          if(on){
+            for(let yy=y; yy<Math.min(y+cell,h); yy++){
+              for(let xx=x; xx<Math.min(x+cell,w); xx++){
+                const p = (yy*w+xx)*4;
+                d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=255;
+              }
+            }
+          }
+        }
+      }
+    } else if(mode === 'stamp'){
+      // ink-stamp bleed: solid fill with a coarse noise field eroding the
+      // edge (uneven border) and, on the 'top' layer only, punching organic
+      // holes that reveal whatever was printed underneath.
+      const cell = Math.max(3, params.stampScale);
+      const edgeField = makeNoiseField(w, h, cell, 0);
+      const bleedAmt = params.stampBleed/100;
+      const holeField = role === 'top' ? makeNoiseField(w, h, cell*0.8, 7.3) : null;
+      const distressAmt = params.stampDistress/100;
+      for(let y=0; y<h; y++){
+        for(let x=0; x<w; x++){
+          const idx = y*w+x;
+          const edgeNoise = (edgeField(x,y)-0.5) * 160 * bleedAmt;
+          let on = gray.gray[idx] < (threshold + edgeNoise);
+          if(on && holeField && holeField(x,y) < distressAmt){
+            on = false;
+          }
+          if(on){
+            const p = idx*4;
+            d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=255;
+          }
+        }
+      }
+    } else {
+      // screen covered: rotated dot grid, classic AM halftone
+      const freq = params.screenFreq;
+      const angle = angleDeg * Math.PI/180;
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      const maxDiag = Math.ceil(Math.sqrt(w*w+h*h));
+      // pre-clear alpha 0
+      for(let p=3;p<d.length;p+=4) d[p]=0;
+
+      for(let gy=-maxDiag; gy<maxDiag; gy+=freq){
+        for(let gx=-maxDiag; gx<maxDiag; gx+=freq){
+          // cell center in rotated space -> back to image space
+          const cx = gx*cos - gy*sin + w/2;
+          const cy = gx*sin + gy*cos + h/2;
+          const ix = Math.round(cx), iy = Math.round(cy);
+          if(ix<0||iy<0||ix>=w||iy>=h) continue;
+          // sample average tone in a freq x freq neighborhood
+          let sum=0,count=0;
+          const half = Math.floor(freq/2);
+          for(let yy=Math.max(0,iy-half); yy<Math.min(h,iy+half+1); yy++){
+            for(let xx=Math.max(0,ix-half); xx<Math.min(w,ix+half+1); xx++){
+              sum += gray.gray[yy*w+xx]; count++;
+            }
+          }
+          if(count===0) continue;
+          const avg = sum/count;
+          if(avg >= threshold) continue; // too light, no dot
+          const darkness = 1 - (avg/threshold); // 0..1
+          const radius = (freq/2) * Math.min(1, Math.max(0.15, darkness));
+          drawDot(d, w, h, cx, cy, radius, r, g, b);
+        }
+      }
+    }
+    lctx.putImageData(imgData, 0, 0);
+    return layer;
+  }
+
+  function drawDot(d, w, h, cx, cy, radius, r, g, b){
+    const r2 = radius*radius;
+    const minX = Math.max(0, Math.floor(cx-radius));
+    const maxX = Math.min(w-1, Math.ceil(cx+radius));
+    const minY = Math.max(0, Math.floor(cy-radius));
+    const maxY = Math.min(h-1, Math.ceil(cy+radius));
+    for(let y=minY; y<=maxY; y++){
+      for(let x=minX; x<=maxX; x++){
+        const dx=x-cx, dy=y-cy;
+        if(dx*dx+dy*dy <= r2){
+          const p=(y*w+x)*4;
+          d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=255;
+        }
+      }
+    }
+  }
+
+  function addPaperGrain(ctx, w, h, amount){
+    if(amount<=0) return;
+    const imgData = ctx.getImageData(0,0,w,h);
+    const d = imgData.data;
+    for(let i=0;i<d.length;i+=4){
+      const n = (Math.random()-0.5)*amount;
+      d[i] = clamp(d[i]+n); d[i+1]=clamp(d[i+1]+n); d[i+2]=clamp(d[i+2]+n);
+    }
+    ctx.putImageData(imgData,0,0);
+  }
+  function clamp(v){ return v<0?0:v>255?255:v; }
+
+  // procedural paper texture: real paper is never a flat tone. this layers
+  // (1) coarse mottling from two octaves of value noise — the soft cloudy
+  // unevenness of a sheet's surface — with (2) short random fiber strokes
+  // for the fine linework of uncoated/recycled stock. runs on the paper fill
+  // *before* the ink layers are composited, so translucent riso ink (multiply)
+  // still lets the texture show through, same as it would on real paper;
+  // opaque stamp ink correctly covers it wherever it prints.
+  function addPaperTexture(ctx, w, h, scale, intensity){
+    if(intensity<=0) return;
+    const amt = intensity/100;
+
+    const cellCoarse = Math.max(20, Math.round(220*scale));
+    const cellFine = Math.max(8, Math.round(70*scale));
+    const nCoarse = makeNoiseField(w, h, cellCoarse, 11.7);
+    const nFine = makeNoiseField(w, h, cellFine, 3.2);
+
+    const imgData = ctx.getImageData(0,0,w,h);
+    const d = imgData.data;
+    for(let y=0; y<h; y++){
+      for(let x=0; x<w; x++){
+        const p = (y*w+x)*4;
+        const mottle = (nCoarse(x,y)*0.65 + nFine(x,y)*0.35 - 0.5) * 26 * amt;
+        d[p]=clamp(d[p]+mottle); d[p+1]=clamp(d[p+1]+mottle); d[p+2]=clamp(d[p+2]+mottle);
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    const fiberCount = Math.round((w*h)/2800 * amt);
+    ctx.save();
+    ctx.lineWidth = Math.max(0.5, scale*0.6);
+    for(let i=0; i<fiberCount; i++){
+      const x = Math.random()*w, y = Math.random()*h;
+      const len = (4 + Math.random()*10) * scale;
+      const ang = Math.random()*Math.PI;
+      const dx = Math.cos(ang)*len/2, dy = Math.sin(ang)*len/2;
+      const dark = Math.random() < 0.5;
+      ctx.strokeStyle = dark ? `rgba(0,0,0,${(0.05*amt).toFixed(3)})` : `rgba(255,255,255,${(0.06*amt).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(x-dx, y-dy);
+      ctx.lineTo(x+dx, y+dy);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // pixel-based params (dot/grain/noise cell sizes, offsets) are tuned for
+  // the on-screen working resolution. `scale` re-derives them for an export
+  // at a higher resolution so the pattern density matches the preview
+  // instead of just looking finer/coarser.
+  function resolveParams(scale){
+    return {
+      grainSize: Math.max(1, Math.round(state.grainSize * scale)),
+      grainRandom: state.grainRandom,
+      screenFreq: Math.max(2, Math.round(state.screenFreq * scale)),
+      stampScale: Math.max(3, Math.round(state.stampScale * scale)),
+      stampBleed: state.stampBleed,
+      stampDistress: state.stampDistress,
+    };
+  }
+
+  // returns the 2 or 3 active inks, sorted broadest-threshold-first (drawn
+  // first/bottom) to tightest-threshold-last (drawn last/top) — so
+  // translucent multiply blending and stamp-mode holes correctly reveal
+  // whatever ink sits underneath. only the bottom-most layer is 'base'
+  // (solid, no holes); every other layer is a 'top' impression over it.
+  function activeInks(){
+    const list = [
+      { color: state.inkA, thresh: state.threshA, angle: state.angleA, offX: state.offAx, offY: state.offAy },
+      { color: state.inkB, thresh: state.threshB, angle: state.angleB, offX: state.offBx, offY: state.offBy },
+    ];
+    if(state.thirdInkEnabled){
+      list.push({ color: state.inkC, thresh: state.threshC, angle: state.angleC, offX: state.offCx, offY: state.offCy });
+    }
+    list.sort((a,b)=>b.thresh-a.thresh);
+    list.forEach((ink,i)=>{ ink.role = i===0 ? 'base' : 'top'; });
+    return list;
+  }
+
+  function renderPipeline(ctx, w, h, gray, scale){
+    ctx.clearRect(0,0,w,h);
+    ctx.fillStyle = state.paper;
+    ctx.fillRect(0,0,w,h);
+    addPaperTexture(ctx, w, h, scale, state.paperTexture);
+
+    const params = resolveParams(scale);
+    const layers = activeInks().map(ink => {
+      const angle = state.halftoneMode==='screen' ? ink.angle : 0;
+      const canvas = buildInkLayer(gray, w, h, ink.thresh, ink.color, state.halftoneMode, angle, ink.role, params);
+      return { canvas, offX: ink.offX*scale, offY: ink.offY*scale };
+    });
+
+    ctx.save();
+    ctx.globalCompositeOperation = state.halftoneMode === 'stamp' ? 'source-over' : 'multiply';
+    for(const layer of layers){
+      ctx.drawImage(layer.canvas, layer.offX, layer.offY);
+    }
+    ctx.restore();
+
+    addPaperGrain(ctx, w, h, state.globalGrain);
+  }
+
+  function render(){
+    if(!state.img || !state.cropApplied) return;
+    const w = srcCanvas.width, h = srcCanvas.height;
+    const gray = getGray();
+    renderPipeline(octx, w, h, gray, 1);
+  }
+
+  function grayFromCanvas(canvas){
+    const ctx = canvas.getContext('2d', {willReadFrequently:true});
+    const {width:w, height:h} = canvas;
+    const imgData = ctx.getImageData(0,0,w,h);
+    const d = imgData.data;
+    const gray = new Uint8ClampedArray(w*h);
+    for(let i=0,p=0; i<d.length; i+=4,p++){
+      gray[p] = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+    }
+    return {w,h,gray};
+  }
+
+  function downloadBlob(blob, filename){
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }
+
+  // re-renders the whole pipeline from the original full-res image at the
+  // requested longest-edge size, instead of just upscaling the preview
+  // canvas, so halftone dots/grain/noise stay crisp at print resolution.
+  function exportAtResolution(longestEdge, statusEl){
+    const img = state.img;
+    // re-derive the crop rectangle in the *original* full-res image from the
+    // pan/zoom applied in the crop UI, so export re-samples straight from
+    // full resolution instead of upscaling the (smaller) working canvas.
+    const srcX = -state.crop.offX/state.crop.scale;
+    const srcY = -state.crop.offY/state.crop.scale;
+    const srcW = srcCanvas.width/state.crop.scale;
+    const srcH = srcCanvas.height/state.crop.scale;
+
+    const ratio = srcCanvas.width/srcCanvas.height;
+    let tw, th;
+    if(ratio >= 1){ tw = longestEdge; th = Math.round(longestEdge/ratio); }
+    else { th = longestEdge; tw = Math.round(longestEdge*ratio); }
+
+    const tmpSrc = document.createElement('canvas');
+    tmpSrc.width = tw; tmpSrc.height = th;
+    tmpSrc.getContext('2d').drawImage(img, srcX, srcY, srcW, srcH, 0, 0, tw, th);
+    const gray = grayFromCanvas(tmpSrc);
+
+    // scale factor relative to the on-screen working resolution, so the
+    // exported pattern looks identical to the preview, just sharper.
+    const scale = tw / srcCanvas.width;
+
+    const outTmp = document.createElement('canvas');
+    outTmp.width = tw; outTmp.height = th;
+    renderPipeline(outTmp.getContext('2d'), tw, th, gray, scale);
+
+    outTmp.toBlob(blob=>{
+      downloadBlob(blob, `riso-fx-export-${tw}x${th}.png`);
+      if(statusEl) statusEl.textContent = '';
+    });
+  }
+
+  let exportRes = 'preview';
+  function setExportRes(r){
+    exportRes = r;
+    document.getElementById('resPreview').classList.toggle('active', r==='preview');
+    document.getElementById('res2k').classList.toggle('active', r==='2048');
+    document.getElementById('res4k').classList.toggle('active', r==='4096');
+  }
+  document.getElementById('resPreview').addEventListener('click', ()=>setExportRes('preview'));
+  document.getElementById('res2k').addEventListener('click', ()=>setExportRes('2048'));
+  document.getElementById('res4k').addEventListener('click', ()=>setExportRes('4096'));
+
+  document.getElementById('btnExport').addEventListener('click', ()=>{
+    if(!state.cropApplied){ alert('aplique o recorte primeiro'); return; }
+    const statusEl = document.getElementById('exportStatus');
+    statusEl.textContent = 'gerando…';
+    // defer so the browser can paint the status text before the (synchronous,
+    // potentially heavy) high-res pipeline runs
+    setTimeout(()=>{
+      if(exportRes === 'preview'){
+        outCanvas.toBlob(blob=>{
+          downloadBlob(blob, 'riso-fx-export.png');
+          statusEl.textContent = '';
+        });
+      } else {
+        exportAtResolution(Number(exportRes), statusEl);
+      }
+    }, 30);
+  });
+
+})();
+</script>
+
+</body>
+</html>
