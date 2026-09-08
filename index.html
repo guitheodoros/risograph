@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Riso FX — Risograph Effect Tool</title>
+<title>Risograph</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -196,8 +196,7 @@
 
 <header>
   <div>
-    <h1>RISO FX</h1>
-    <p>simulador de efeito risográfico &middot; duotone &middot; halftone &middot; misregistration</p>
+    <h1>RISOGRAPH</h1>
   </div>
   <a href="https://theodoros.cc" target="_blank" rel="noopener">theodoros.cc</a>
 </header>
@@ -224,13 +223,20 @@
           <option value="9:16">9:16</option>
         </select>
       </div>
+      <div class="row" id="cropZoomRow" style="display:none;">
+        <label>zoom</label><input type="range" id="cropZoom" min="0" max="100" value="0">
+      </div>
+      <div class="btn-row" id="cropToolsRow" style="display:none;">
+        <button class="btn" id="btnRecenterCrop" style="flex:1;">⊙ centralizar</button>
+        <button class="btn" id="btnRotateCrop" style="flex:1;">⟳ girar 90°</button>
+      </div>
       <div class="btn-row" id="cropButtons" style="display:none;">
         <button class="btn primary" id="btnApplyCrop" style="flex:1;">✓ aplicar recorte</button>
       </div>
       <div class="btn-row" id="editCropRow" style="display:none;">
         <button class="btn" id="btnEditCrop" style="flex:1;">✂ editar recorte</button>
       </div>
-      <p id="cropHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">arraste pra posicionar &middot; scroll pra zoom</p>
+      <p id="cropHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">arraste (ou toque) pra posicionar &middot; scroll ou pinça pra zoom</p>
     </div>
 
     <div class="panel">
@@ -341,14 +347,14 @@
     <div class="titlebar"><span id="canvasTitle">PREVIEW</span><span id="statusLabel">sem imagem</span></div>
     <div id="canvasHost">
       <canvas id="outCanvas" width="900" height="600"></canvas>
-      <canvas id="cropCanvas" width="900" height="600" style="display:none;max-width:100%;cursor:grab;"></canvas>
+      <canvas id="cropCanvas" width="900" height="600" style="display:none;max-width:100%;cursor:grab;touch-action:none;"></canvas>
       <div class="drop-hint" id="dropHint">solte uma imagem aqui, cole com ctrl+v,<br>ou use "carregar imagem"</div>
     </div>
   </div>
 </div>
 
 <footer>
-  riso fx &middot; processamento 100% local no navegador (canvas 2d) &middot; nenhuma imagem é enviada a servidor
+  risograph &middot; processamento 100% local no navegador (canvas 2d) &middot; nenhuma imagem é enviada a servidor
 </footer>
 
 <script>
@@ -395,7 +401,7 @@
     paper: "#f2ede1",
     paperTexture: 45,
     globalGrain: 15,
-    crop: { ratio: 'original', scale: 1, offX: 0, offY: 0 },
+    crop: { ratio: 'original', scale: 1, offX: 0, offY: 0, rotation: 0 },
     cropApplied: false,
   };
 
@@ -596,6 +602,8 @@
     cropCanvas.style.display = 'none';
     outCanvas.style.display = '';
     document.getElementById('cropButtons').style.display = 'none';
+    document.getElementById('cropZoomRow').style.display = 'none';
+    document.getElementById('cropToolsRow').style.display = 'none';
     document.getElementById('editCropRow').style.display = 'none';
     document.getElementById('cropHint').style.display = 'none';
   });
@@ -604,9 +612,35 @@
   const ASPECTS = { '1:1':1, '4:5':0.8, '5:4':1.25, '16:9':16/9, '9:16':9/16 };
   const CROP_MAX_DIM = 1100;
 
+  // 90/270 rotation swaps which of the image's own axes is "width" vs
+  // "height" for every fit/aspect/clamp computation below.
+  function rotatedNaturalDims(){
+    const img = state.img;
+    const swapped = state.crop.rotation % 180 !== 0;
+    return swapped
+      ? { w: img.naturalHeight, h: img.naturalWidth }
+      : { w: img.naturalWidth, h: img.naturalHeight };
+  }
+
+  // draws `img` rotated about the center of its own (post-rotation) bounding
+  // box, that box's top-left placed at (destX,destY) — used identically by
+  // the live crop preview, the committed crop, and high-res export, so all
+  // three treat rotation the same way.
+  function drawRotatedImage(ctx, img, rotation, destX, destY, scale){
+    const iw = img.naturalWidth*scale, ih = img.naturalHeight*scale;
+    const swapped = rotation % 180 !== 0;
+    const effW = swapped ? ih : iw, effH = swapped ? iw : ih;
+    ctx.save();
+    ctx.translate(destX + effW/2, destY + effH/2);
+    ctx.rotate(rotation * Math.PI/180);
+    ctx.drawImage(img, -iw/2, -ih/2, iw, ih);
+    ctx.restore();
+  }
+
   function currentAspectRatio(){
     if(state.crop.ratio === 'original'){
-      return state.img.naturalWidth / state.img.naturalHeight;
+      const {w, h} = rotatedNaturalDims();
+      return w/h;
     }
     return ASPECTS[state.crop.ratio];
   }
@@ -620,14 +654,14 @@
   }
 
   function coverScale(w, h){
-    const img = state.img;
-    return Math.max(w/img.naturalWidth, h/img.naturalHeight);
+    const {w:nw, h:nh} = rotatedNaturalDims();
+    return Math.max(w/nw, h/nh);
   }
 
   function clampCropOffsets(){
-    const img = state.img;
     const {width:w, height:h} = cropCanvas;
-    const iw = img.naturalWidth*state.crop.scale, ih = img.naturalHeight*state.crop.scale;
+    const {w:nw, h:nh} = rotatedNaturalDims();
+    const iw = nw*state.crop.scale, ih = nh*state.crop.scale;
     // image must always fully cover the crop frame: offsets stay between
     // (frame - image) and 0 on each axis.
     state.crop.offX = Math.min(0, Math.max(w-iw, state.crop.offX));
@@ -638,15 +672,39 @@
     const {w, h} = computeCropDims();
     cropCanvas.width = w; cropCanvas.height = h;
     state.crop.scale = coverScale(w, h);
-    state.crop.offX = (w - state.img.naturalWidth*state.crop.scale)/2;
-    state.crop.offY = (h - state.img.naturalHeight*state.crop.scale)/2;
+    const {w:nw, h:nh} = rotatedNaturalDims();
+    state.crop.offX = (w - nw*state.crop.scale)/2;
+    state.crop.offY = (h - nh*state.crop.scale)/2;
+    syncZoomSlider();
+  }
+
+  function recenterCrop(){
+    const {width:w, height:h} = cropCanvas;
+    const {w:nw, h:nh} = rotatedNaturalDims();
+    state.crop.offX = (w - nw*state.crop.scale)/2;
+    state.crop.offY = (h - nh*state.crop.scale)/2;
+    clampCropOffsets();
+    drawCropCanvas();
+  }
+
+  // zoom slider (0-100) maps linearly onto scale in [minScale, minScale*6],
+  // since the meaningful zoom range shifts with aspect ratio/rotation.
+  function zoomToSlider(scale, minScale){
+    return Math.round(Math.min(100, Math.max(0, ((scale/minScale)-1)/5*100)));
+  }
+  function sliderToZoom(value, minScale){
+    return minScale * (1 + (value/100)*5);
+  }
+  function syncZoomSlider(){
+    const slider = document.getElementById('cropZoom');
+    const minScale = coverScale(cropCanvas.width, cropCanvas.height);
+    slider.value = zoomToSlider(state.crop.scale, minScale);
   }
 
   function drawCropCanvas(){
-    const img = state.img;
     const {width:w, height:h} = cropCanvas;
     cctx.clearRect(0,0,w,h);
-    cctx.drawImage(img, state.crop.offX, state.crop.offY, img.naturalWidth*state.crop.scale, img.naturalHeight*state.crop.scale);
+    drawRotatedImage(cctx, state.img, state.crop.rotation, state.crop.offX, state.crop.offY, state.crop.scale);
     // rule-of-thirds guide
     cctx.strokeStyle = 'rgba(255,255,255,0.5)';
     cctx.lineWidth = 1;
@@ -660,28 +718,32 @@
     outCanvas.style.display = 'none';
     cropCanvas.style.display = '';
     document.getElementById('cropButtons').style.display = '';
+    document.getElementById('cropZoomRow').style.display = '';
+    document.getElementById('cropToolsRow').style.display = '';
     document.getElementById('editCropRow').style.display = 'none';
     document.getElementById('cropHint').style.display = '';
     canvasTitle.textContent = 'AJUSTAR RECORTE';
     drawCropCanvas();
+    syncZoomSlider();
   }
 
   function showResultUI(){
     cropCanvas.style.display = 'none';
     outCanvas.style.display = '';
     document.getElementById('cropButtons').style.display = 'none';
+    document.getElementById('cropZoomRow').style.display = 'none';
+    document.getElementById('cropToolsRow').style.display = 'none';
     document.getElementById('editCropRow').style.display = '';
     document.getElementById('cropHint').style.display = 'none';
     canvasTitle.textContent = 'PREVIEW';
   }
 
   function applyCrop(){
-    const img = state.img;
     const {width:w, height:h} = cropCanvas;
     outCanvas.width = w; outCanvas.height = h;
     srcCanvas.width = w; srcCanvas.height = h;
     sctx.clearRect(0,0,w,h);
-    sctx.drawImage(img, state.crop.offX, state.crop.offY, img.naturalWidth*state.crop.scale, img.naturalHeight*state.crop.scale);
+    drawRotatedImage(sctx, state.img, state.crop.rotation, state.crop.offX, state.crop.offY, state.crop.scale);
     grayCache = null;
     state.cropApplied = true;
     applyAutoThreshold();
@@ -700,13 +762,48 @@
   document.getElementById('btnEditCrop').addEventListener('click', ()=>{
     showCropUI();
   });
+  document.getElementById('btnRecenterCrop').addEventListener('click', recenterCrop);
+  document.getElementById('btnRotateCrop').addEventListener('click', ()=>{
+    state.crop.rotation = (state.crop.rotation + 90) % 360;
+    // aspect ratios other than "original" keep their frame shape after a
+    // rotation, but the image's own orientation inside it just swapped, so
+    // a full refit (not just recenter) is the least surprising behavior.
+    resetCropFit();
+    drawCropCanvas();
+  });
+
+  function zoomSliderInput(){
+    const slider = document.getElementById('cropZoom');
+    const minScale = coverScale(cropCanvas.width, cropCanvas.height);
+    const newScale = sliderToZoom(Number(slider.value), minScale);
+    const cx = cropCanvas.width/2, cy = cropCanvas.height/2;
+    const imgX = (cx - state.crop.offX)/state.crop.scale, imgY = (cy - state.crop.offY)/state.crop.scale;
+    state.crop.scale = newScale;
+    state.crop.offX = cx - imgX*newScale;
+    state.crop.offY = cy - imgY*newScale;
+    clampCropOffsets();
+    drawCropCanvas();
+  }
+  document.getElementById('cropZoom').addEventListener('input', zoomSliderInput);
 
   let dragging = false, dragLastX = 0, dragLastY = 0;
-  function cropCanvasPoint(e){
+  function cropCanvasPoint(clientX, clientY){
     const rect = cropCanvas.getBoundingClientRect();
     const scaleX = cropCanvas.width/rect.width, scaleY = cropCanvas.height/rect.height;
-    return { x:(e.clientX-rect.left)*scaleX, y:(e.clientY-rect.top)*scaleY };
+    return { x:(clientX-rect.left)*scaleX, y:(clientY-rect.top)*scaleY };
   }
+  function zoomAt(px, py, newScale){
+    const minScale = coverScale(cropCanvas.width, cropCanvas.height);
+    newScale = Math.min(minScale*6, Math.max(minScale, newScale));
+    const imgX = (px - state.crop.offX)/state.crop.scale, imgY = (py - state.crop.offY)/state.crop.scale;
+    state.crop.scale = newScale;
+    state.crop.offX = px - imgX*newScale;
+    state.crop.offY = py - imgY*newScale;
+    clampCropOffsets();
+    drawCropCanvas();
+    syncZoomSlider();
+  }
+
   cropCanvas.addEventListener('mousedown', e=>{
     dragging = true;
     dragLastX = e.clientX; dragLastY = e.clientY;
@@ -728,19 +825,55 @@
   });
   cropCanvas.addEventListener('wheel', e=>{
     e.preventDefault();
-    const {x:mx, y:my} = cropCanvasPoint(e);
+    const {x:mx, y:my} = cropCanvasPoint(e.clientX, e.clientY);
     const factor = e.deltaY < 0 ? 1.08 : 1/1.08;
-    const minScale = coverScale(cropCanvas.width, cropCanvas.height);
-    const oldScale = state.crop.scale;
-    const newScale = Math.min(minScale*6, Math.max(minScale, oldScale*factor));
-    // keep the point under the cursor fixed while zooming
-    const imgX = (mx - state.crop.offX)/oldScale, imgY = (my - state.crop.offY)/oldScale;
-    state.crop.scale = newScale;
-    state.crop.offX = mx - imgX*newScale;
-    state.crop.offY = my - imgY*newScale;
-    clampCropOffsets();
-    drawCropCanvas();
+    zoomAt(mx, my, state.crop.scale*factor);
   }, {passive:false});
+
+  // touch: one finger pans, two fingers pinch-zoom (+ pan the pinch midpoint)
+  let touchMode = null; // 'pan' | 'pinch'
+  let touchLastX = 0, touchLastY = 0, pinchStartDist = 0, pinchStartScale = 1;
+  function touchDist(t1, t2){ return Math.hypot(t2.clientX-t1.clientX, t2.clientY-t1.clientY); }
+  cropCanvas.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    if(e.touches.length === 1){
+      touchMode = 'pan';
+      touchLastX = e.touches[0].clientX; touchLastY = e.touches[0].clientY;
+    } else if(e.touches.length >= 2){
+      touchMode = 'pinch';
+      pinchStartDist = touchDist(e.touches[0], e.touches[1]);
+      pinchStartScale = state.crop.scale;
+    }
+  }, {passive:false});
+  cropCanvas.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    if(touchMode === 'pan' && e.touches.length === 1){
+      const t = e.touches[0];
+      const rect = cropCanvas.getBoundingClientRect();
+      const scaleX = cropCanvas.width/rect.width, scaleY = cropCanvas.height/rect.height;
+      state.crop.offX += (t.clientX-touchLastX)*scaleX;
+      state.crop.offY += (t.clientY-touchLastY)*scaleY;
+      touchLastX = t.clientX; touchLastY = t.clientY;
+      clampCropOffsets();
+      drawCropCanvas();
+    } else if(touchMode === 'pinch' && e.touches.length >= 2){
+      const dist = touchDist(e.touches[0], e.touches[1]);
+      const midX = (e.touches[0].clientX+e.touches[1].clientX)/2;
+      const midY = (e.touches[0].clientY+e.touches[1].clientY)/2;
+      const {x:px, y:py} = cropCanvasPoint(midX, midY);
+      zoomAt(px, py, pinchStartScale*(dist/pinchStartDist));
+    }
+  }, {passive:false});
+  function touchEnd(e){
+    if(e.touches.length === 1){
+      touchMode = 'pan';
+      touchLastX = e.touches[0].clientX; touchLastY = e.touches[0].clientY;
+    } else if(e.touches.length === 0){
+      touchMode = null;
+    }
+  }
+  cropCanvas.addEventListener('touchend', touchEnd);
+  cropCanvas.addEventListener('touchcancel', touchEnd);
 
   // ---------- image loading ----------
   const fileInput = document.getElementById('fileInput');
@@ -772,6 +905,7 @@
     img.onload = ()=>{
       state.img = img;
       state.cropApplied = false;
+      state.crop.rotation = 0;
       URL.revokeObjectURL(url);
       dropHint.style.display = 'none';
       statusLabel.textContent = img.naturalWidth + '×' + img.naturalHeight;
@@ -1203,7 +1337,17 @@
   // canvas, so halftone dots/grain/noise stay crisp at print resolution.
   function exportAtResolution(longestEdge, statusEl){
     const img = state.img;
-    // re-derive the crop rectangle in the *original* full-res image from the
+    // rotation mixes x/y, so a straight source-rect crop no longer works
+    // directly against the original file — first rasterize the whole image
+    // rotated at full native resolution once, then crop-rect sample from
+    // that (still full-res, no quality loss) exactly like the no-rotation
+    // path used to sample directly from `img`.
+    const {w: natW, h: natH} = rotatedNaturalDims();
+    const fullRotated = document.createElement('canvas');
+    fullRotated.width = natW; fullRotated.height = natH;
+    drawRotatedImage(fullRotated.getContext('2d'), img, state.crop.rotation, 0, 0, 1);
+
+    // re-derive the crop rectangle in that full-res rotated image from the
     // pan/zoom applied in the crop UI, so export re-samples straight from
     // full resolution instead of upscaling the (smaller) working canvas.
     const srcX = -state.crop.offX/state.crop.scale;
@@ -1218,7 +1362,7 @@
 
     const tmpSrc = document.createElement('canvas');
     tmpSrc.width = tw; tmpSrc.height = th;
-    tmpSrc.getContext('2d').drawImage(img, srcX, srcY, srcW, srcH, 0, 0, tw, th);
+    tmpSrc.getContext('2d').drawImage(fullRotated, srcX, srcY, srcW, srcH, 0, 0, tw, th);
     const gray = grayFromCanvas(tmpSrc);
 
     // scale factor relative to the on-screen working resolution, so the
@@ -1230,7 +1374,7 @@
     renderPipeline(outTmp.getContext('2d'), tw, th, gray, scale);
 
     outTmp.toBlob(blob=>{
-      downloadBlob(blob, `riso-fx-export-${tw}x${th}.png`);
+      downloadBlob(blob, `risograph-export-${tw}x${th}.png`);
       if(statusEl) statusEl.textContent = '';
     });
   }
@@ -1255,7 +1399,7 @@
     setTimeout(()=>{
       if(exportRes === 'preview'){
         outCanvas.toBlob(blob=>{
-          downloadBlob(blob, 'riso-fx-export.png');
+          downloadBlob(blob, 'risograph-export.png');
           statusEl.textContent = '';
         });
       } else {
