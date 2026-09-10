@@ -63,6 +63,8 @@
     background:var(--panel);
     border:2px solid var(--ink);
     padding:10px;
+    position:sticky;
+    top:16px;
   }
   .canvas-wrap .titlebar{
     display:flex;
@@ -84,8 +86,12 @@
   }
   #outCanvas{
     max-width:100%;
+    max-height:calc(100vh - 52px);
     display:block;
     image-rendering:pixelated;
+  }
+  #cropCanvas{
+    max-height:calc(100vh - 52px);
   }
   .drop-hint{
     position:absolute;
