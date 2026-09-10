@@ -189,6 +189,19 @@
   }
   @media (max-width: 800px){
     .layout{ grid-template-columns:1fr; }
+    /* keep the preview visible while scrolling through controls below it,
+       instead of it sitting after every panel at the bottom of the page. */
+    .canvas-wrap{
+      order:-1;
+      position:sticky;
+      top:0;
+      z-index:5;
+      margin:0 -16px 12px;
+      border-left:none;
+      border-right:none;
+    }
+    #canvasHost{ max-height:42vh; }
+    #outCanvas, #cropCanvas{ max-height:42vh; width:auto; height:auto; }
   }
 </style>
 </head>
@@ -313,10 +326,10 @@
       <h2>Papel &amp; Grão</h2>
       <div class="row"><label>fundo</label>
         <select id="paperSelect">
-          <option value="#f2ede1">branco riso</option>
-          <option value="#e8ddc4">kraft claro</option>
-          <option value="#d8cdb4">kraft</option>
-          <option value="#e3e3e3">cinza</option>
+          <option value="riso" data-color="#f2ede1">branco riso</option>
+          <option value="kraft-claro" data-color="#e8ddc4">kraft claro</option>
+          <option value="kraft" data-color="#d8cdb4">kraft</option>
+          <option value="cinza" data-color="#e3e3e3">cinza</option>
           <option value="custom">custom…</option>
         </select>
       </div>
@@ -399,6 +412,7 @@
     offBx: 2, offBy: -1,
     offCx: -2, offCy: 2,
     paper: "#f2ede1",
+    paperProfile: "riso",
     paperTexture: 45,
     globalGrain: 15,
     crop: { ratio: 'original', scale: 1, offX: 0, offY: 0, rotation: 0 },
@@ -541,12 +555,13 @@
   const customPaperRow = document.getElementById('customPaperRow');
   const paperCustom = document.getElementById('paperCustom');
   paperSelect.addEventListener('change', ()=>{
+    state.paperProfile = paperSelect.value;
     if(paperSelect.value === 'custom'){
       customPaperRow.style.display = '';
       state.paper = paperCustom.value;
     } else {
       customPaperRow.style.display = 'none';
-      state.paper = paperSelect.value;
+      state.paper = paperSelect.selectedOptions[0].dataset.color;
     }
     checkInkContrast();
     render();
@@ -1205,16 +1220,42 @@
   }
   function clamp(v){ return v<0?0:v>255?255:v; }
 
+  // each paper option gets its own texture character, not just a color —
+  // real kraft has coarse, denser, grain-aligned fiber and visible flecks;
+  // riso white/text stock is close to flat with only faint mottling.
+  //   mottle: multiplier on the coarse tonal-unevenness amplitude
+  //   fiberDensity / fiberLen: how many fiber strokes and how long
+  //   angleBias: dominant fiber direction in radians (grain direction from
+  //     manufacturing), or null for fully random/isotropic
+  //   speckDensity: sparse larger fiber-fleck blotches (0 = none)
+  const PAPER_PROFILES = {
+    riso:          { mottle:0.6,  fiberDensity:0.5, fiberLen:[3,8],   angleBias:null,        speckDensity:0 },
+    'kraft-claro': { mottle:0.9,  fiberDensity:1.2, fiberLen:[5,13],  angleBias:Math.PI/2,   speckDensity:0.5 },
+    kraft:         { mottle:1.2,  fiberDensity:1.8, fiberLen:[6,18],  angleBias:Math.PI/2,   speckDensity:1 },
+    cinza:         { mottle:0.7,  fiberDensity:0.8, fiberLen:[4,10],  angleBias:null,        speckDensity:0.2 },
+    custom:        { mottle:0.7,  fiberDensity:0.8, fiberLen:[4,10],  angleBias:null,        speckDensity:0.25 },
+  };
+
+  function shadeRgb(hex, percent){
+    const {r,g,b} = hexToRgb(hex);
+    const t = percent < 0 ? 0 : 255;
+    const p = Math.abs(percent)/100;
+    return { r:Math.round((t-r)*p+r), g:Math.round((t-g)*p+g), b:Math.round((t-b)*p+b) };
+  }
+
   // procedural paper texture: real paper is never a flat tone. this layers
   // (1) coarse mottling from two octaves of value noise — the soft cloudy
-  // unevenness of a sheet's surface — with (2) short random fiber strokes
-  // for the fine linework of uncoated/recycled stock. runs on the paper fill
-  // *before* the ink layers are composited, so translucent riso ink (multiply)
-  // still lets the texture show through, same as it would on real paper;
-  // opaque stamp ink correctly covers it wherever it prints.
-  function addPaperTexture(ctx, w, h, scale, intensity){
+  // unevenness of a sheet's surface — (2) short fiber strokes for the fine
+  // linework of uncoated/recycled stock, optionally grain-aligned — and
+  // (3) sparse larger flecks of fiber, tinted from the paper's own color.
+  // runs on the paper fill *before* the ink layers are composited, so
+  // translucent riso ink (multiply) still lets the texture show through,
+  // same as it would on real paper; opaque stamp ink correctly covers it
+  // wherever it prints.
+  function addPaperTexture(ctx, w, h, scale, intensity, profileKey){
     if(intensity<=0) return;
     const amt = intensity/100;
+    const prof = PAPER_PROFILES[profileKey] || PAPER_PROFILES.riso;
 
     const cellCoarse = Math.max(20, Math.round(220*scale));
     const cellFine = Math.max(8, Math.round(70*scale));
@@ -1226,19 +1267,21 @@
     for(let y=0; y<h; y++){
       for(let x=0; x<w; x++){
         const p = (y*w+x)*4;
-        const mottle = (nCoarse(x,y)*0.65 + nFine(x,y)*0.35 - 0.5) * 26 * amt;
+        const mottle = (nCoarse(x,y)*0.65 + nFine(x,y)*0.35 - 0.5) * 26 * amt * prof.mottle;
         d[p]=clamp(d[p]+mottle); d[p+1]=clamp(d[p+1]+mottle); d[p+2]=clamp(d[p+2]+mottle);
       }
     }
     ctx.putImageData(imgData, 0, 0);
 
-    const fiberCount = Math.round((w*h)/2800 * amt);
+    const fiberCount = Math.round((w*h)/2800 * amt * prof.fiberDensity);
+    const [lenMin, lenMax] = prof.fiberLen;
+    const angleSpread = (35 * Math.PI/180); // ±35° scatter around the grain direction
     ctx.save();
     ctx.lineWidth = Math.max(0.5, scale*0.6);
     for(let i=0; i<fiberCount; i++){
       const x = Math.random()*w, y = Math.random()*h;
-      const len = (4 + Math.random()*10) * scale;
-      const ang = Math.random()*Math.PI;
+      const len = (lenMin + Math.random()*(lenMax-lenMin)) * scale;
+      const ang = prof.angleBias === null ? Math.random()*Math.PI : prof.angleBias + (Math.random()-0.5)*angleSpread;
       const dx = Math.cos(ang)*len/2, dy = Math.sin(ang)*len/2;
       const dark = Math.random() < 0.5;
       ctx.strokeStyle = dark ? `rgba(0,0,0,${(0.05*amt).toFixed(3)})` : `rgba(255,255,255,${(0.06*amt).toFixed(3)})`;
@@ -1248,6 +1291,25 @@
       ctx.stroke();
     }
     ctx.restore();
+
+    if(prof.speckDensity > 0){
+      const speckCount = Math.round((w*h)/9000 * amt * prof.speckDensity);
+      const darkFleck = shadeRgb(state.paper, -35);
+      const lightFleck = shadeRgb(state.paper, 45);
+      ctx.save();
+      for(let i=0; i<speckCount; i++){
+        const x = Math.random()*w, y = Math.random()*h;
+        const r = (1.5 + Math.random()*2.5) * scale;
+        const dark = Math.random() < 0.7; // real fiber flecks read mostly darker
+        const c = dark ? darkFleck : lightFleck;
+        const alpha = (0.10 + Math.random()*0.10) * amt;
+        ctx.fillStyle = `rgba(${c.r},${c.g},${c.b},${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, r, r*(0.6+Math.random()*0.6), Math.random()*Math.PI, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   // pixel-based params (dot/grain/noise cell sizes, offsets) are tuned for
@@ -1287,7 +1349,7 @@
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = state.paper;
     ctx.fillRect(0,0,w,h);
-    addPaperTexture(ctx, w, h, scale, state.paperTexture);
+    addPaperTexture(ctx, w, h, scale, state.paperTexture, state.paperProfile);
 
     const params = resolveParams(scale);
     const layers = activeInks().map(ink => {
