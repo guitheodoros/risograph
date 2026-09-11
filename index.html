@@ -358,8 +358,8 @@
       <div class="row" id="customPaperRow" style="display:none;">
         <label>cor custom</label><input type="color" id="paperCustom" value="#f2ede1">
       </div>
-      <div class="row" id="paperTextureRow"><label>textura de papel</label><input type="range" id="paperTexture" min="0" max="100" value="45"><span class="val" id="paperTextureVal">45</span></div>
-      <div class="row" id="globalGrainRow"><label>grão global</label><input type="range" id="globalGrain" min="0" max="60" value="15"><span class="val" id="globalGrainVal">15</span></div>
+      <div class="row" id="paperTextureRow"><label>textura de papel</label><input type="range" id="paperTexture" min="0" max="100" value="70"><span class="val" id="paperTextureVal">70</span></div>
+      <div class="row" id="globalGrainRow"><label>grão global</label><input type="range" id="globalGrain" min="0" max="80" value="28"><span class="val" id="globalGrainVal">28</span></div>
       <p id="transparentHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">export sai em PNG com fundo transparente</p>
     </div>
 
@@ -436,8 +436,8 @@
     offCx: -2, offCy: 2,
     paper: "#f2ede1",
     paperProfile: "riso",
-    paperTexture: 45,
-    globalGrain: 15,
+    paperTexture: 70,
+    globalGrain: 28,
     crop: { ratio: 'original', scale: 1, offX: 0, offY: 0, rotation: 0 },
     cropApplied: false,
     curveBlack: 0,
@@ -1461,7 +1461,6 @@
     if(!state.transparentBg){
       ctx.fillStyle = state.paper;
       ctx.fillRect(0,0,w,h);
-      addPaperTexture(ctx, w, h, scale, state.paperTexture, state.paperProfile);
     }
 
     const params = resolveParams(scale);
@@ -1479,6 +1478,11 @@
     ctx.restore();
 
     if(!state.transparentBg){
+      // grain pass runs after the ink so the fiber texture reads on the
+      // printed color itself (like a real riso overprint), not just on
+      // the bare paper showing through — stamp mode's opaque ink used to
+      // hide the texture entirely since it replaced the paper below it.
+      addPaperTexture(ctx, w, h, scale, state.paperTexture, state.paperProfile);
       addPaperGrain(ctx, w, h, state.globalGrain);
     }
   }
