@@ -65,6 +65,9 @@
     padding:10px;
     position:sticky;
     top:16px;
+    width:fit-content;
+    max-width:100%;
+    justify-self:start;
   }
   .canvas-wrap .titlebar{
     display:flex;
@@ -76,7 +79,8 @@
   }
   #canvasHost{
     position:relative;
-    width:100%;
+    width:fit-content;
+    max-width:100%;
     min-height:300px;
     background:repeating-conic-gradient(#ddd 0% 25%, #eee 0% 50%) 50% / 16px 16px;
     display:flex;
@@ -205,8 +209,11 @@
       margin:0 -16px 12px;
       border-left:none;
       border-right:none;
+      width:auto;
+      max-width:none;
+      justify-self:stretch;
     }
-    #canvasHost{ max-height:42vh; }
+    #canvasHost{ width:100%; max-width:none; max-height:42vh; }
     #outCanvas, #cropCanvas{ max-height:42vh; width:auto; height:auto; }
   }
 </style>
