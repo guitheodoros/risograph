@@ -7,14 +7,60 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // tema escolhido antes do primeiro paint: preferência salva, senão escuro
+  (function(){
+    var t = "";
+    try { t = localStorage.getItem("risograph-theme") || ""; } catch(e){}
+    if (t !== "light") t = "dark";
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
 <style>
+  /* dois temas da interface: claro (papel bege) e escuro (grafite). O tema
+     vai em <html data-theme>, escolhido antes do primeiro paint pelo script
+     no <head> (preferência salva, senão escuro). As cores padrão da arte
+     (tintas, papel) ficam no state e não mudam com o tema. */
   :root{
+    color-scheme:light;
     --bg:#e8e3d8;
     --panel:#f5f2ea;
-    --ink:#111;
+    --field:#fff;
+    --hover:#ddd8cc;
     --border:#111;
+    --control:#111;
+    --text:#111;
+    --on-text:#fff;
     --muted:#6b6558;
     --accent:#0078bf;
+    --accent-dark:#00507f;
+    --accent-top:#1a8fd6;
+    --seg-text:var(--text);
+    --btn-top:#2e2e2e; --btn-bottom:#111; --btn-border:#111; --btn-lip:#000;
+    --btn-text:#fff; --btn-hl:rgba(255,255,255,.16);
+    --pri-top:#2e2e2e; --pri-bottom:#111; --pri-border:#111; --pri-lip:#000;
+    --pri-text:#fff; --pri-hl:rgba(255,255,255,.16); --pri-tshadow:#000;
+  }
+  :root[data-theme="dark"]{
+    color-scheme:dark;
+    --bg:#141414;
+    --panel:#1e1e1e;
+    --field:#262626;
+    --hover:#2e2e2e;
+    --border:#3a3a3a;
+    --control:#4a4a4a;
+    --text:#ececec;
+    --on-text:#141414;
+    --muted:#8a8a8a;
+    --accent:#3fa9f5;
+    --accent-dark:#1c6ea3;
+    --accent-top:#63bdfb;
+    --seg-text:#bdbdbd;
+    --btn-top:#3a3a3a; --btn-bottom:#2a2a2a; --btn-border:#4a4a4a; --btn-lip:#0a0a0a;
+    --btn-text:#ececec; --btn-hl:rgba(255,255,255,.1);
+    /* no escuro a ação principal (Export) é o único botão claro */
+    --pri-top:#fff; --pri-bottom:#dcdcdc; --pri-border:#bdbdbd; --pri-lip:#8a8a8a;
+    --pri-text:#141414; --pri-hl:#fff; --pri-tshadow:rgba(255,255,255,.7);
   }
   *{box-sizing:border-box;}
   body{
@@ -24,7 +70,7 @@
     font-weight:300;
     font-style:normal;
     background:var(--bg);
-    color:var(--ink);
+    color:var(--text);
     padding:16px;
   }
   header{
@@ -32,7 +78,7 @@
     justify-content:space-between;
     align-items:baseline;
     margin-bottom:12px;
-    border-bottom:2px solid var(--ink);
+    border-bottom:2px solid var(--border);
     padding-bottom:10px;
   }
   header h1{
@@ -52,7 +98,17 @@
     text-decoration:none;
     white-space:nowrap;
   }
-  header a:hover{ color:var(--ink); text-decoration:underline; }
+  header a:hover{ color:var(--text); text-decoration:underline; }
+  .header-actions{ display:flex; align-items:center; gap:12px; }
+  #themeBtn{
+    width:28px; height:28px; padding:0; display:grid; place-items:center; flex:none;
+    background:var(--field); color:var(--text); border:1px solid var(--control); border-radius:50%;
+    box-shadow:none; text-shadow:none;
+  }
+  #themeBtn:hover{ background:var(--hover); filter:none; }
+  #themeBtn:active{ transform:scale(.92); box-shadow:none; }
+  #themeBtn svg{ width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  :root[data-theme="dark"] #themeBtn .moon, :root:not([data-theme="dark"]) #themeBtn .sun{ display:none; }
   .layout{
     display:grid;
     grid-template-columns:300px 1fr;
@@ -61,7 +117,7 @@
   }
   .canvas-wrap{
     background:var(--panel);
-    border:2px solid var(--ink);
+    border:2px solid var(--border);
     padding:10px;
     position:sticky;
     top:16px;
@@ -111,7 +167,7 @@
   }
   .panel{
     background:var(--panel);
-    border:2px solid var(--ink);
+    border:2px solid var(--border);
     padding:12px;
     margin-bottom:12px;
   }
@@ -121,9 +177,19 @@
     margin:0 0 10px;
     text-transform:uppercase;
     letter-spacing:1px;
-    border-bottom:1px solid var(--ink);
+    border-bottom:1px solid var(--border);
     padding-bottom:6px;
   }
+  /* painéis recolhíveis (como no Typexperimental/Ditherfy): <details
+     name="painel"> é um acordeão nativo, abrir um fecha o que estava aberto */
+  details.panel > summary{ list-style:none; cursor:pointer; user-select:none; }
+  details.panel > summary::-webkit-details-marker{ display:none; }
+  details.panel > summary h2{ display:flex; justify-content:space-between; align-items:center; }
+  details.panel > summary h2::after{ content:"+"; font-size:15px; font-weight:400; line-height:10px; color:var(--muted); }
+  details.panel[open] > summary h2::after{ content:"−"; }
+  details.panel:not([open]) > summary h2{ margin-bottom:0; padding-bottom:0; border-bottom-color:transparent; }
+  details.panel > summary:hover h2::after{ color:var(--text); }
+  details.panel > summary:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; }
   .row{
     display:flex;
     justify-content:space-between;
@@ -143,38 +209,77 @@
   }
   input[type=range]{
     flex:2;
-    accent-color:var(--ink);
+    accent-color:var(--text);
   }
   select, input[type=color]{
     font-family:inherit;
     font-size:11px;
-    border:1px solid var(--ink);
-    background:#fff;
-    padding:3px;
+    border:1px solid var(--control);
+    border-radius:3px;
+    background:var(--field);
+    color:var(--text);
+    padding:4px 6px;
   }
+  select:hover, input[type=color]:hover{ border-color:var(--text); }
+  input[type=color]::-webkit-color-swatch-wrapper{ padding:2px; }
+  input[type=color]::-webkit-color-swatch{ border:1px solid var(--muted); border-radius:2px; }
+  input[type=color]::-moz-color-swatch{ border:1px solid var(--muted); border-radius:2px; }
+  /* botões: acabamento do Rich Button (degradê de cima pra baixo, brilho
+     interno, sombra no texto) + o "apertar" do Pop Button (borda de baixo
+     mais grossa que afunda no clique) — porte do Spell UI (Typexperimental). */
   .btn{
     font-family:inherit;
     font-size:11px;
     font-weight:500;
-    background:#fff;
-    border:1px solid var(--ink);
-    padding:7px 10px;
-    cursor:pointer;
     text-transform:uppercase;
     letter-spacing:.5px;
+    color:var(--btn-text);
+    border:1px solid var(--btn-border);
+    border-radius:3px;
+    padding:7px 10px;
+    cursor:pointer;
+    background:linear-gradient(to bottom, var(--btn-top), var(--btn-bottom));
+    box-shadow:inset 0 1px 0 var(--btn-hl), 0 3px 0 var(--btn-lip);
+    text-shadow:0 1px 0 #000;
+    transition:filter .2s, transform .1s, box-shadow .1s, background-color .15s, color .15s;
   }
-  .btn:hover{ background:#111; color:#fff; }
-  .btn.primary{ background:#111; color:#fff; }
-  .btn.primary:hover{ background:#fff; color:#111; }
+  .btn:hover{ filter:brightness(1.2); }
+  .btn:active{ transform:translateY(2px); box-shadow:inset 0 1px 0 var(--btn-hl), 0 1px 0 var(--btn-lip); filter:brightness(.95); }
+  .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .btn:disabled{ cursor:progress; filter:none; transform:none; }
+  .btn.primary{
+    color:var(--pri-text); border-color:var(--pri-border);
+    background:linear-gradient(to bottom, var(--pri-top), var(--pri-bottom));
+    box-shadow:inset 0 1px 0 var(--pri-hl), 0 3px 0 var(--pri-lip);
+    text-shadow:0 1px 0 var(--pri-tshadow);
+  }
+  .btn.primary:active{ box-shadow:inset 0 1px 0 var(--pri-hl), 0 1px 0 var(--pri-lip); }
   .btn-row{ display:flex; gap:6px; flex-wrap:wrap; }
+  /* spinner do Spell UI: dois arcos com degradê girando; máscara herda a
+     cor do texto (currentColor) onde for usado */
+  .spinner{
+    display:inline-block; width:12px; height:12px; flex:none; vertical-align:-2px; margin-right:6px;
+    background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='50%25' x2='50%25' y1='5.271%25' y2='91.793%25'%3E%3Cstop offset='0%25'/%3E%3Cstop offset='100%25' stop-opacity='.55'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='50%25' x2='50%25' y1='15.24%25' y2='87.15%25'%3E%3Cstop offset='0%25' stop-opacity='0'/%3E%3Cstop offset='100%25' stop-opacity='.55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(1.5 1.625)'%3E%3Cpath fill='url(%23a)' d='M8.749.021a1.5 1.5 0 0 1 .497 2.958A7.5 7.5 0 0 0 3 10.375a7.5 7.5 0 0 0 7.5 7.5v3c-5.799 0-10.5-4.7-10.5-10.5C0 5.23 3.726.865 8.749.021'/%3E%3Cpath fill='url(%23b)' d='M15.392 2.673a1.5 1.5 0 0 1 2.119-.115A10.48 10.48 0 0 1 21 10.375c0 5.8-4.701 10.5-10.5 10.5v-3a7.5 7.5 0 0 0 5.007-13.084a1.5 1.5 0 0 1-.115-2.118'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='50%25' x2='50%25' y1='5.271%25' y2='91.793%25'%3E%3Cstop offset='0%25'/%3E%3Cstop offset='100%25' stop-opacity='.55'/%3E%3C/linearGradient%3E%3ClinearGradient id='b' x1='50%25' x2='50%25' y1='15.24%25' y2='87.15%25'%3E%3Cstop offset='0%25' stop-opacity='0'/%3E%3Cstop offset='100%25' stop-opacity='.55'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg transform='translate(1.5 1.625)'%3E%3Cpath fill='url(%23a)' d='M8.749.021a1.5 1.5 0 0 1 .497 2.958A7.5 7.5 0 0 0 3 10.375a7.5 7.5 0 0 0 7.5 7.5v3c-5.799 0-10.5-4.7-10.5-10.5C0 5.23 3.726.865 8.749.021'/%3E%3Cpath fill='url(%23b)' d='M15.392 2.673a1.5 1.5 0 0 1 2.119-.115A10.48 10.48 0 0 1 21 10.375c0 5.8-4.701 10.5-10.5 10.5v-3a7.5 7.5 0 0 0 5.007-13.084a1.5 1.5 0 0 1-.115-2.118'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat;
+    animation:spin 1s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce){
+    .btn{ transition:none; }
+    .spinner{ animation-duration:3s; }
+  }
   .swatches{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .swatch{
     width:22px; height:22px;
     border:2px solid transparent;
+    border-radius:3px;
     cursor:pointer;
   }
-  .swatch.active{ border-color:var(--ink); }
-  .toggle-group{ display:flex; border:1px solid var(--ink); }
+  .swatch.active{ border-color:var(--text); }
+  /* grupo segmentado: botões colados que não afundam sozinhos, só cantos
+     arredondados nas pontas e uma troca de estado suave (porte do Spell UI) */
+  .toggle-group{ display:flex; border:1px solid var(--control); border-radius:3px; overflow:hidden; }
   .toggle-group button{
     flex:1;
     font-family:inherit;
@@ -182,14 +287,19 @@
     font-weight:500;
     padding:6px 4px;
     border:none;
-    background:#fff;
+    background:var(--field);
+    color:var(--seg-text);
     cursor:pointer;
     text-transform:uppercase;
+    transition:background-color .15s, color .15s;
   }
-  .toggle-group button.active{ background:#111; color:#fff; }
-  .layer-block{ border-top:1px dashed #999; padding-top:8px; margin-top:8px; }
+  .toggle-group button + button{ border-left:1px solid var(--control); }
+  .toggle-group button:hover{ background:var(--hover); color:var(--text); }
+  .toggle-group button.active{ background:var(--text); color:var(--on-text); }
+  .toggle-group button:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .layer-block{ border-top:1px dashed var(--control); padding-top:8px; margin-top:8px; }
   .layer-label{ font-size:11px; font-weight:600; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
-  .dot{ width:10px; height:10px; display:inline-block; border:1px solid var(--ink); }
+  .dot{ width:10px; height:10px; display:inline-block; border:1px solid var(--border); }
   footer{
     margin-top:16px;
     font-size:10px;
@@ -224,7 +334,13 @@
   <div>
     <h1>RISOGRAPH</h1>
   </div>
-  <a href="https://theodoros.cc" target="_blank" rel="noopener">theodoros.cc</a>
+  <div class="header-actions">
+    <a href="https://theodoros.cc" target="_blank" rel="noopener">theodoros.cc</a>
+    <button id="themeBtn" type="button">
+      <svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.2A8.5 8.5 0 0 1 8.8 3.6 8.5 8.5 0 1 0 20.4 15.2Z"/></svg>
+      <svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
 </header>
 
 <div class="layout">
@@ -250,7 +366,7 @@
         </select>
       </div>
       <div class="row" id="cropZoomRow" style="display:none;">
-        <label>zoom</label><input type="range" id="cropZoom" min="0" max="100" value="0">
+        <label>zoom</label><input type="range" id="cropZoom" autocomplete="off" min="0" max="100" value="0">
       </div>
       <div class="btn-row" id="cropToolsRow" style="display:none;">
         <button class="btn" id="btnRecenterCrop" style="flex:1;">⊙ centralizar</button>
@@ -265,16 +381,16 @@
       <p id="cropHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">arraste (ou toque) pra posicionar &middot; scroll ou pinça pra zoom</p>
     </div>
 
-    <div class="panel">
-      <h2>Curva de Tons</h2>
-      <div class="row"><label>sombras</label><input type="range" id="curveBlack" min="0" max="254" value="0"><span class="val" id="curveBlackVal">0</span></div>
-      <div class="row"><label>médios</label><input type="range" id="curveMid" min="-100" max="100" value="0"><span class="val" id="curveMidVal">0</span></div>
-      <div class="row"><label>realces</label><input type="range" id="curveWhite" min="1" max="255" value="255"><span class="val" id="curveWhiteVal">255</span></div>
+    <details class="panel" name="painel">
+      <summary><h2>Curva de Tons</h2></summary>
+      <div class="row"><label>sombras</label><input type="range" id="curveBlack" autocomplete="off" min="0" max="254" value="0"><span class="val" id="curveBlackVal">0</span></div>
+      <div class="row"><label>médios</label><input type="range" id="curveMid" autocomplete="off" min="-100" max="100" value="0"><span class="val" id="curveMidVal">0</span></div>
+      <div class="row"><label>realces</label><input type="range" id="curveWhite" autocomplete="off" min="1" max="255" value="255"><span class="val" id="curveWhiteVal">255</span></div>
       <button class="btn" id="btnResetCurve" style="width:100%;margin-top:4px;">↺ resetar curva</button>
-    </div>
+    </details>
 
-    <div class="panel">
-      <h2 id="inksTitle">Tintas (duotone)</h2>
+    <details class="panel" name="painel" open>
+      <summary><h2 id="inksTitle">Tintas (duotone)</h2></summary>
 
       <div class="toggle-group" style="margin-bottom:10px;">
         <button class="active" id="btnDuotone">duotone</button>
@@ -286,26 +402,26 @@
       <div class="layer-block" style="border-top:none;padding-top:0;margin-top:0;">
         <div class="layer-label"><span class="dot" id="dotA" style="background:#0078bf;"></span> Tinta A (sombras)</div>
         <div class="swatches" id="swatchA"></div>
-        <div class="row"><label>threshold</label><input type="range" id="threshA" min="0" max="255" value="90"><span class="val" id="threshAVal">90</span></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshA" autocomplete="off" min="0" max="255" value="90"><span class="val" id="threshAVal">90</span></div>
       </div>
 
       <div class="layer-block">
         <div class="layer-label"><span class="dot" id="dotB" style="background:#ff48b0;"></span> Tinta B (meio-tom)</div>
         <div class="swatches" id="swatchB"></div>
-        <div class="row"><label>threshold</label><input type="range" id="threshB" min="0" max="255" value="170"><span class="val" id="threshBVal">170</span></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshB" autocomplete="off" min="0" max="255" value="170"><span class="val" id="threshBVal">170</span></div>
       </div>
 
       <div class="layer-block" id="layerBlockC" style="display:none;">
         <div class="layer-label"><span class="dot" id="dotC" style="background:#a4dc30;"></span> Tinta C (realces)</div>
         <div class="swatches" id="swatchC"></div>
-        <div class="row"><label>threshold</label><input type="range" id="threshC" min="0" max="255" value="210"><span class="val" id="threshCVal">210</span></div>
+        <div class="row"><label>threshold</label><input type="range" id="threshC" autocomplete="off" min="0" max="255" value="210"><span class="val" id="threshCVal">210</span></div>
       </div>
 
       <p id="contrastWarning" style="display:none;font-size:10px;line-height:1.4;color:#8a3b12;background:#fbe9d0;border:1px solid #8a3b12;padding:6px 8px;margin:10px 0 0;"></p>
-    </div>
+    </details>
 
-    <div class="panel">
-      <h2>Halftone</h2>
+    <details class="panel" name="painel">
+      <summary><h2>Halftone</h2></summary>
       <div class="toggle-group" style="margin-bottom:10px;">
         <button class="active" data-mode="grain" id="modeGrain">grain touch</button>
         <button data-mode="screen" id="modeScreen">screen covered</button>
@@ -313,38 +429,38 @@
       </div>
 
       <div id="grainControls">
-        <div class="row"><label>tamanho do grão</label><input type="range" id="grainSize" min="1" max="6" value="2"><span class="val" id="grainSizeVal">2</span></div>
-        <div class="row"><label>aleatoriedade</label><input type="range" id="grainRandom" min="0" max="100" value="30"><span class="val" id="grainRandomVal">30</span></div>
+        <div class="row"><label>tamanho do grão</label><input type="range" id="grainSize" autocomplete="off" min="1" max="6" value="2"><span class="val" id="grainSizeVal">2</span></div>
+        <div class="row"><label>aleatoriedade</label><input type="range" id="grainRandom" autocomplete="off" min="0" max="100" value="30"><span class="val" id="grainRandomVal">30</span></div>
       </div>
 
       <div id="stampControls" style="display:none;">
         <p style="font-size:10px;color:var(--muted);margin:0 0 8px;">carimbo de tinta: a tinta de threshold mais alto vira a base sólida; as demais imprimem desgastadas por cima, revelando a de baixo nos furos.</p>
-        <div class="row"><label>sangria da borda</label><input type="range" id="stampBleed" min="0" max="100" value="0"><span class="val" id="stampBleedVal">0</span></div>
-        <div class="row"><label>distress (furos)</label><input type="range" id="stampDistress" min="0" max="100" value="2"><span class="val" id="stampDistressVal">2</span></div>
-        <div class="row"><label>escala do ruído</label><input type="range" id="stampScale" min="4" max="40" value="4"><span class="val" id="stampScaleVal">4</span></div>
+        <div class="row"><label>sangria da borda</label><input type="range" id="stampBleed" autocomplete="off" min="0" max="100" value="0"><span class="val" id="stampBleedVal">0</span></div>
+        <div class="row"><label>distress (furos)</label><input type="range" id="stampDistress" autocomplete="off" min="0" max="100" value="2"><span class="val" id="stampDistressVal">2</span></div>
+        <div class="row"><label>escala do ruído</label><input type="range" id="stampScale" autocomplete="off" min="4" max="40" value="4"><span class="val" id="stampScaleVal">4</span></div>
       </div>
 
       <div id="screenControls" style="display:none;">
-        <div class="row"><label>frequência (px/célula)</label><input type="range" id="screenFreq" min="3" max="16" value="6"><span class="val" id="screenFreqVal">6</span></div>
-        <div class="row"><label>ângulo A</label><input type="range" id="angleA" min="0" max="90" value="15"><span class="val" id="angleAVal">15°</span></div>
-        <div class="row"><label>ângulo B</label><input type="range" id="angleB" min="0" max="90" value="75"><span class="val" id="angleBVal">75°</span></div>
-        <div class="row" id="angleCRow" style="display:none;"><label>ângulo C</label><input type="range" id="angleC" min="0" max="90" value="45"><span class="val" id="angleCVal">45°</span></div>
+        <div class="row"><label>frequência (px/célula)</label><input type="range" id="screenFreq" autocomplete="off" min="3" max="16" value="6"><span class="val" id="screenFreqVal">6</span></div>
+        <div class="row"><label>ângulo A</label><input type="range" id="angleA" autocomplete="off" min="0" max="90" value="15"><span class="val" id="angleAVal">15°</span></div>
+        <div class="row"><label>ângulo B</label><input type="range" id="angleB" autocomplete="off" min="0" max="90" value="75"><span class="val" id="angleBVal">75°</span></div>
+        <div class="row" id="angleCRow" style="display:none;"><label>ângulo C</label><input type="range" id="angleC" autocomplete="off" min="0" max="90" value="45"><span class="val" id="angleCVal">45°</span></div>
       </div>
-    </div>
+    </details>
 
-    <div class="panel">
-      <h2>Misregistration</h2>
-      <div class="row"><label>offset A · x</label><input type="range" id="offAx" min="-10" max="10" value="0"><span class="val" id="offAxVal">0</span></div>
-      <div class="row"><label>offset A · y</label><input type="range" id="offAy" min="-10" max="10" value="0"><span class="val" id="offAyVal">0</span></div>
-      <div class="row"><label>offset B · x</label><input type="range" id="offBx" min="-10" max="10" value="2"><span class="val" id="offBxVal">2</span></div>
-      <div class="row"><label>offset B · y</label><input type="range" id="offBy" min="-10" max="10" value="-1"><span class="val" id="offByVal">-1</span></div>
-      <div class="row" id="offCxRow" style="display:none;"><label>offset C · x</label><input type="range" id="offCx" min="-10" max="10" value="-2"><span class="val" id="offCxVal">-2</span></div>
-      <div class="row" id="offCyRow" style="display:none;"><label>offset C · y</label><input type="range" id="offCy" min="-10" max="10" value="2"><span class="val" id="offCyVal">2</span></div>
+    <details class="panel" name="painel">
+      <summary><h2>Misregistration</h2></summary>
+      <div class="row"><label>offset A · x</label><input type="range" id="offAx" autocomplete="off" min="-10" max="10" value="0"><span class="val" id="offAxVal">0</span></div>
+      <div class="row"><label>offset A · y</label><input type="range" id="offAy" autocomplete="off" min="-10" max="10" value="0"><span class="val" id="offAyVal">0</span></div>
+      <div class="row"><label>offset B · x</label><input type="range" id="offBx" autocomplete="off" min="-10" max="10" value="2"><span class="val" id="offBxVal">2</span></div>
+      <div class="row"><label>offset B · y</label><input type="range" id="offBy" autocomplete="off" min="-10" max="10" value="-1"><span class="val" id="offByVal">-1</span></div>
+      <div class="row" id="offCxRow" style="display:none;"><label>offset C · x</label><input type="range" id="offCx" autocomplete="off" min="-10" max="10" value="-2"><span class="val" id="offCxVal">-2</span></div>
+      <div class="row" id="offCyRow" style="display:none;"><label>offset C · y</label><input type="range" id="offCy" autocomplete="off" min="-10" max="10" value="2"><span class="val" id="offCyVal">2</span></div>
       <button class="btn" id="btnJitter" style="width:100%;margin-top:4px;">🎲 randomize jitter</button>
-    </div>
+    </details>
 
-    <div class="panel">
-      <h2>Papel &amp; Grão</h2>
+    <details class="panel" name="painel">
+      <summary><h2>Papel &amp; Grão</h2></summary>
       <div class="row"><label>fundo</label>
         <select id="paperSelect">
           <option value="riso" data-color="#f2ede1">branco riso</option>
@@ -358,10 +474,10 @@
       <div class="row" id="customPaperRow" style="display:none;">
         <label>cor custom</label><input type="color" id="paperCustom" value="#f2ede1">
       </div>
-      <div class="row" id="paperTextureRow"><label>textura de papel</label><input type="range" id="paperTexture" min="0" max="100" value="70"><span class="val" id="paperTextureVal">70</span></div>
-      <div class="row" id="globalGrainRow"><label>grão global</label><input type="range" id="globalGrain" min="0" max="80" value="28"><span class="val" id="globalGrainVal">28</span></div>
+      <div class="row" id="paperTextureRow"><label>textura de papel</label><input type="range" id="paperTexture" autocomplete="off" min="0" max="100" value="70"><span class="val" id="paperTextureVal">70</span></div>
+      <div class="row" id="globalGrainRow"><label>grão global</label><input type="range" id="globalGrain" autocomplete="off" min="0" max="80" value="28"><span class="val" id="globalGrainVal">28</span></div>
       <p id="transparentHint" style="display:none;font-size:10px;color:var(--muted);margin:8px 0 0;">export sai em PNG com fundo transparente</p>
-    </div>
+    </details>
 
     <div class="panel">
       <h2>Export</h2>
@@ -447,7 +563,7 @@
   };
 
   const outCanvas = document.getElementById('outCanvas');
-  const octx = outCanvas.getContext('2d');
+  const octx = outCanvas.getContext('2d', {willReadFrequently:true});
   const cropCanvas = document.getElementById('cropCanvas');
   const cctx = cropCanvas.getContext('2d');
   const dropHint = document.getElementById('dropHint');
@@ -1529,7 +1645,7 @@
   // re-renders the whole pipeline from the original full-res image at the
   // requested longest-edge size, instead of just upscaling the preview
   // canvas, so halftone dots/grain/noise stay crisp at print resolution.
-  function exportAtResolution(longestEdge, statusEl){
+  function exportAtResolution(longestEdge, statusEl, onDone){
     const img = state.img;
     // rotation mixes x/y, so a straight source-rect crop no longer works
     // directly against the original file — first rasterize the whole image
@@ -1565,9 +1681,11 @@
 
     const outTmp = document.createElement('canvas');
     outTmp.width = tw; outTmp.height = th;
-    renderPipeline(outTmp.getContext('2d'), tw, th, gray, scale);
+    renderPipeline(outTmp.getContext('2d', {willReadFrequently:true}), tw, th, gray, scale);
 
     outTmp.toBlob(blob=>{
+      if(onDone) onDone();
+      if(!blob){ if(statusEl) statusEl.textContent = 'não foi possível gerar o PNG nesse tamanho'; return; }
       downloadBlob(blob, `risograph-export-${tw}x${th}-${exportTimestamp()}.png`);
       if(statusEl) statusEl.textContent = '';
     });
@@ -1584,23 +1702,45 @@
   document.getElementById('res2k').addEventListener('click', ()=>setExportRes('2048'));
   document.getElementById('res4k').addEventListener('click', ()=>setExportRes('4096'));
 
-  document.getElementById('btnExport').addEventListener('click', ()=>{
+  const btnExport = document.getElementById('btnExport');
+  const btnExportLabel = btnExport.innerHTML;
+  btnExport.addEventListener('click', ()=>{
     if(!state.cropApplied){ alert('aplique o recorte primeiro'); return; }
     const statusEl = document.getElementById('exportStatus');
-    statusEl.textContent = 'gerando…';
-    // defer so the browser can paint the status text before the (synchronous,
+    statusEl.textContent = '';
+    btnExport.disabled = true;
+    btnExport.innerHTML = '<span class="spinner"></span>gerando…';
+    const done = ()=>{ btnExport.disabled = false; btnExport.innerHTML = btnExportLabel; };
+    // defer so the browser can paint the spinner before the (synchronous,
     // potentially heavy) high-res pipeline runs
     setTimeout(()=>{
       if(exportRes === 'preview'){
         outCanvas.toBlob(blob=>{
+          done();
+          if(!blob){ statusEl.textContent = 'não foi possível gerar o PNG nesse tamanho'; return; }
           downloadBlob(blob, `risograph-export-${exportTimestamp()}.png`);
-          statusEl.textContent = '';
         });
       } else {
-        exportAtResolution(Number(exportRes), statusEl);
+        exportAtResolution(Number(exportRes), statusEl, done);
       }
     }, 30);
   });
+
+  // tema claro/escuro: o <html data-theme> já foi escolhido antes do
+  // primeiro paint (script no <head>); aqui só o botão liga/desliga e persiste.
+  const themeBtn = document.getElementById('themeBtn');
+  function syncThemeBtn(){
+    const label = document.documentElement.dataset.theme === 'dark' ? 'Mudar para o modo claro' : 'Mudar para o modo escuro';
+    themeBtn.setAttribute('aria-label', label);
+    themeBtn.title = label;
+  }
+  themeBtn.addEventListener('click', ()=>{
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('risograph-theme', next); } catch(e){}
+    syncThemeBtn();
+  });
+  syncThemeBtn();
 
 })();
 </script>
